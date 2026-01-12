@@ -254,8 +254,8 @@ namespace SqliteMcp
             }
         }
 
-        [McpServerTool(Destructive = true, ReadOnly = false, Name = "query")]
-        [Description("Execute a raw SQL query against the database with optional parameter values")]
+        [McpServerTool(Destructive = true, ReadOnly = false, Name = "execute_query")]
+        [Description("Execute a SQL query against the database with optional parameter values")]
         public string ExecuteQuery(string sqlQuery, Dictionary<string, object>? parameters = null)
         {
             try
