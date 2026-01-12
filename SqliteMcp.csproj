@@ -13,7 +13,7 @@
     <PublishSingleFile>true</PublishSingleFile>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageId>SqliteMcp</PackageId>
-    <PackageVersion>1.0.0</PackageVersion>
+    <PackageVersion>1.0.1</PackageVersion>
     <PackageTags>AI; MCP; server; stdio</PackageTags>
     <Description>MCP server for Sqlite database operations.</Description>
     <Authors>Anuraj</Authors>
