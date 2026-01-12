@@ -1,0 +1,35 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
+  "description": "MCP server for Sqlite database operations.",
+  "name": "io.github.anuraj/SqliteMcp",
+  "version": "1.0.0",
+  "packages": [
+    {
+      "registryType": "nuget",
+      "registryBaseUrl": "https://api.nuget.org",
+      "identifier": "SqliteMcp",
+      "version": "1.0.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [],
+      "environmentVariables": [
+        {
+          "name": "SQLITE_DB_PATH",
+          "value": "{sqlite_db_path}",
+          "variables": {
+            "sqlite_db_path": {
+              "description": "Path to the SQLite database file.",
+              "isRequired": true,
+              "isSecret": false
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "repository": {
+    "url": "https://github.com/anuraj/SqliteMcp",
+    "source": "github"
+  }
+}

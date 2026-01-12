@@ -5,6 +5,20 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <PackAsTool>true</PackAsTool>
+    <PackageType>McpServer</PackageType>
+    <McpServerJsonTemplateFile>.mcp\server.json</McpServerJsonTemplateFile>
+    <SelfContained>true</SelfContained>
+    <PublishSelfContained>true</PublishSelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageId>SqliteMcp</PackageId>
+    <PackageVersion>1.0.0</PackageVersion>
+    <PackageTags>AI; MCP; server; stdio</PackageTags>
+    <Description>MCP server for Sqlite database operations.</Description>
+    <Authors>Anuraj</Authors>
+    <ProjectUrl>https://github.com/anuraj/SqliteMcp</ProjectUrl>
+    <RepositoryUrl>https://github.com/anuraj/SqliteMcp</RepositoryUrl>
   </PropertyGroup>
 
   <ItemGroup>
@@ -12,5 +26,8 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.1" />
     <PackageReference Include="ModelContextProtocol" Version="0.5.0-preview.1" />
   </ItemGroup>
-
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="/" />
+    <None Include=".mcp/server.json" Pack="true" PackagePath="/.mcp/" />
+  </ItemGroup>
 </Project>
