@@ -255,7 +255,7 @@ namespace SqliteMcp
         }
 
         [McpServerTool(Destructive = true, ReadOnly = false, Name = "execute_query")]
-        [Description("Execute a SQL query against the database with optional parameter values")]
+        [Description("Execute a SQL query against the database with optional parameter values and return the results")]
         public string ExecuteQuery(string sqlQuery, Dictionary<string, object>? parameters = null)
         {
             try
@@ -274,11 +274,31 @@ namespace SqliteMcp
                             command.Parameters.AddWithValue("@" + kvp.Key, kvp.Value);
                         }
                     }
+                    
+                    //Logic to determine if the query is a SELECT or not
+                    if (!sqlQuery.TrimStart().StartsWith("SELECT", StringComparison.OrdinalIgnoreCase))
+                    {
+                        int rowsAffected = command.ExecuteNonQuery();
+                        _sqliteConnection.Close();
+                        return $"{rowsAffected} row(s) affected.";
+                    }
 
-                    int rowsAffected = command.ExecuteNonQuery();
+                    var reader = command.ExecuteReader();
+                    var results = new List<Dictionary<string, object>>();
+                    while (reader.Read())
+                    {
+                        var row = new Dictionary<string, object>();
+                        for (int i = 0; i < reader.FieldCount; i++)
+                        {
+                            row[reader.GetName(i)] = reader.GetValue(i);
+                        }
+                        results.Add(row);
+                    }
                     _sqliteConnection.Close();
 
-                    return $"Query executed successfully. Rows affected: {rowsAffected}.";
+                    return results.Count > 0
+                        ? JsonSerializer.Serialize(results)
+                        : "Query executed successfully with no results.";
                 }
             }
             catch (Exception ex)
