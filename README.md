@@ -3,7 +3,7 @@
 A .NET Model Context Protocol (MCP) server for SQLite database operations. Enables AI agents and LLMs to interact with SQLite databases through a standardized MCP interface.
 
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/anuraj/SqliteMcp/ci.yml?branch=main)
-![NuGet Version](https://img.shields.io/nuget/v/SqliteMcp)
+[![NuGet Version](https://img.shields.io/nuget/v/SqliteMcp)](https://www.nuget.org/packages/SqliteMcp)
 ![GitHub License](https://img.shields.io/github/license/anuraj/SqliteMcp)
 
 ## Overview
