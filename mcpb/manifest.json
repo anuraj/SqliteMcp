@@ -1,7 +1,7 @@
 {
   "manifest_version": "0.2",
   "name": "SqliteMcp",
-  "version": "1.0.0",
+  "version": "1.0.4",
   "description": "MCP server for SQLite database operations",
   "long_description": "MCP server for SQLite database operations. Enables AI agents and LLMs to interact with SQLite databases through a standardized MCP interface.",
   "author": {
@@ -9,9 +9,9 @@
     "email": "anuraj@anuraj.dev",
     "url": "https://anuraj.dev"
   },
-  "homepage": "https://github.com/anuraj/sqlitemcp",
-  "documentation": "https://github.com/anuraj/sqlitemcp",
-  "support": "https://github.com/anuraj/sqlitemcp",
+  "homepage": "https://github.com/anuraj/SqliteMcp",
+  "documentation": "https://github.com/anuraj/SqliteMcp",
+  "support": "https://github.com/anuraj/SqliteMcp",
   "server": {
     "type": "binary",
     "entry_point": "SqliteMcp.exe",
