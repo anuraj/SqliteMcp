@@ -1,0 +1,78 @@
+{
+  "manifest_version": "0.2",
+  "name": "SqliteMcp",
+  "version": "1.0.0",
+  "description": "MCP server for SQLite database operations",
+  "long_description": "MCP server for SQLite database operations. Enables AI agents and LLMs to interact with SQLite databases through a standardized MCP interface.",
+  "author": {
+    "name": "anuraj",
+    "email": "anuraj@anuraj.dev",
+    "url": "https://anuraj.dev"
+  },
+  "homepage": "https://github.com/anuraj/sqlitemcp",
+  "documentation": "https://github.com/anuraj/sqlitemcp",
+  "support": "https://github.com/anuraj/sqlitemcp",
+  "server": {
+    "type": "binary",
+    "entry_point": "SqliteMcp.exe",
+    "mcp_config": {
+      "command": "${__dirname}\\SqliteMcp.exe",
+      "args": [],
+      "env": {
+        "SQLITE_DB_PATH": "${user_config.SQLITE_DB_PATH}"
+      }
+    }
+  },
+  "tools": [
+    {
+      "name": "db_info",
+      "description": "Get information about the SQLite database including path, existence, size, and table count"
+    },
+    {
+      "name": "list_tables",
+      "description": "List all user tables in the SQLite database (excludes system tables)"
+    },
+    {
+      "name": "get_table_schema",
+      "description": "Get the schema of a specified table in the SQLite database"
+    },
+    {
+      "name": "create_record",
+      "description": "Create a new record in the specified table with given column values"
+    },
+    {
+      "name": "read_records",
+      "description": "Read records from a table with optional conditions, limit, and offset"
+    },
+    {
+      "name": "update_records",
+      "description": "Update records in a table based on conditions with specified column values"
+    },
+    {
+      "name": "delete_records",
+      "description": "Delete records from a table based on conditions"
+    },
+    {
+      "name": "execute_query",
+      "description": "Execute a SQL query against the database with optional parameter values and return the results"
+    }
+  ],
+  "user_config": {
+    "SQLITE_DB_PATH": {
+      "type": "file",
+      "title": "Sqlite Database Path",
+      "description": "Location of the sqlite database file with filename",
+      "required": true,
+      "sensitive": false
+    }
+  },
+  "keywords": [
+    "mcp",
+    "sqlite"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/anuraj/sqlitemcp"
+  }
+}
