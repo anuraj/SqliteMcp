@@ -1,4 +1,6 @@
 name: .NET
+permissions:
+  contents: read
 on:
   push:
     branches: [main]
@@ -9,21 +11,86 @@ on:
     paths-ignore:
       - "README.md"
   workflow_dispatch:
+
 jobs:
-  build:
+  ci:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      already_published: ${{ steps.version_check.outputs.already_published }}
 
     steps:
       - uses: actions/checkout@v4
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
+
       - name: Restore dependencies
-        run: dotnet restore
+        run: dotnet restore SqliteMcp.sln
+
       - name: Build
-        run: dotnet build --no-restore
+        run: dotnet build SqliteMcp.sln --no-restore
+
+      - name: Test with code coverage
+        run: |
+          dotnet test Tests/SqliteMcp.Tests/SqliteMcp.Tests.csproj \
+            --no-build \
+            --collect:"XPlat Code Coverage" \
+            --results-directory ./coverage
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: ./coverage/**/coverage.cobertura.xml
+          retention-days: 7
+
+      - name: Read package version
+        id: version
+        run: |
+          VERSION=$(grep -oP '(?<=<PackageVersion>)[^<]+' Src/SqliteMcp.csproj)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Check if version is already published on NuGet
+        id: version_check
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            "https://api.nuget.org/v3-flatcontainer/sqlitemcp/${VERSION}/sqlitemcp.${VERSION}.nupkg")
+          if [ "$STATUS" = "200" ]; then
+            echo "already_published=true" >> $GITHUB_OUTPUT
+            echo "Version $VERSION is already published — skipping deploy."
+          elif [ "$STATUS" = "404" ]; then
+            echo "already_published=false" >> $GITHUB_OUTPUT
+            echo "Version $VERSION is new — will deploy."
+          else
+            echo "Failed to determine whether version $VERSION is published (HTTP $STATUS)." >&2
+            exit 1
+          fi
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: ci
+    if: |
+      github.ref == 'refs/heads/main' &&
+      github.event_name == 'push' &&
+      needs.ci.outputs.already_published == 'false'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore dependencies
+        run: dotnet restore Src/SqliteMcp.csproj
+
       - name: Pack
-        run: dotnet pack -c Release
+        run: dotnet pack Src/SqliteMcp.csproj -c Release --no-restore
+
       - name: Deploy to NuGet
-        run: dotnet nuget push bin/Release/*.nupkg --api-key ${{ secrets.NUGET_APIKEY }} --source https://api.nuget.org/v3/index.json
+        run: dotnet nuget push Src/bin/Release/*.nupkg --api-key ${{ secrets.NUGET_APIKEY }} --source https://api.nuget.org/v3/index.json
