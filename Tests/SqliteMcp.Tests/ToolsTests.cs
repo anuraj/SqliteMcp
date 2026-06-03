@@ -42,8 +42,14 @@ public class ToolsTests : IDisposable
     private void CreateProductsTable() =>
         Execute("CREATE TABLE IF NOT EXISTS Products (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL, Price REAL)");
 
+    private void CreateWeirdProductsTable() =>
+        Execute("CREATE TABLE IF NOT EXISTS WeirdProducts (Id INTEGER PRIMARY KEY, [Display Name] TEXT NOT NULL, [Unit Price] REAL)");
+
     private void SeedProducts() =>
         Execute("INSERT INTO Products (Name, Price) VALUES ('Apple', 1.99), ('Banana', 0.99), ('Cherry', 3.49)");
+
+    private void SeedWeirdProducts() =>
+        Execute("INSERT INTO WeirdProducts ([Display Name], [Unit Price]) VALUES ('Dragon Fruit', 5.99), ('Star Fruit', 4.49)");
 
     // ── GetDatabaseInfo ─────────────────────────────────────────────────────
 
@@ -113,6 +119,14 @@ public class ToolsTests : IDisposable
         Assert.Contains("does not exist", result);
     }
 
+    [Fact]
+    public void GetTableSchema_SystemTable_ReturnsError()
+    {
+        CreateProductsTable();
+        var result = _tools.GetTableSchema("sqlite_master");
+        Assert.Contains("system table", result);
+    }
+
     // ── CreateRecord ────────────────────────────────────────────────────────
 
     [Fact]
@@ -136,6 +150,18 @@ public class ToolsTests : IDisposable
             ["Name"] = "X"
         });
         Assert.Contains("Error", result);
+    }
+
+    [Fact]
+    public void CreateRecord_WithSpacedColumnName_ReturnsSuccessMessage()
+    {
+        CreateWeirdProductsTable();
+        var result = _tools.CreateRecord("WeirdProducts", new Dictionary<string, object>
+        {
+            ["Display Name"] = "Passion Fruit",
+            ["Unit Price"] = 6.79
+        });
+        Assert.Contains("successfully created", result);
     }
 
     // ── ReadRecords ─────────────────────────────────────────────────────────
@@ -196,6 +222,34 @@ public class ToolsTests : IDisposable
         Assert.Contains("Error", result);
     }
 
+    [Fact]
+    public void ReadRecords_WithSpacedConditionColumn_ReturnsFilteredRows()
+    {
+        CreateWeirdProductsTable();
+        SeedWeirdProducts();
+        var result = _tools.ReadRecords("WeirdProducts", new Dictionary<string, object> { ["Display Name"] = "Dragon Fruit" });
+        var rows = JsonSerializer.Deserialize<List<Dictionary<string, JsonElement>>>(result);
+        Assert.NotNull(rows);
+        Assert.Single(rows);
+        Assert.Equal("Dragon Fruit", rows[0]["Display Name"].GetString());
+    }
+
+    [Fact]
+    public void ReadRecords_NegativeLimit_ReturnsError()
+    {
+        CreateProductsTable();
+        var result = _tools.ReadRecords("Products", limit: -1);
+        Assert.Contains("Limit must be non-negative", result);
+    }
+
+    [Fact]
+    public void ReadRecords_NegativeOffset_ReturnsError()
+    {
+        CreateProductsTable();
+        var result = _tools.ReadRecords("Products", offset: -1);
+        Assert.Contains("Offset must be non-negative", result);
+    }
+
     // ── UpdateRecords ───────────────────────────────────────────────────────
 
     [Fact]
@@ -232,6 +286,18 @@ public class ToolsTests : IDisposable
         Assert.Contains("Error", result);
     }
 
+    [Fact]
+    public void UpdateRecords_WithSpacedColumnNames_ReturnsUpdatedCount()
+    {
+        CreateWeirdProductsTable();
+        SeedWeirdProducts();
+        var result = _tools.UpdateRecords(
+            "WeirdProducts",
+            new Dictionary<string, object> { ["Unit Price"] = 7.25 },
+            new Dictionary<string, object> { ["Display Name"] = "Dragon Fruit" });
+        Assert.Contains("1 record(s) successfully updated", result);
+    }
+
     // ── DeleteRecords ───────────────────────────────────────────────────────
 
     [Fact]
@@ -263,6 +329,17 @@ public class ToolsTests : IDisposable
             "Ghost",
             new Dictionary<string, object> { ["Id"] = 1 });
         Assert.Contains("Error", result);
+    }
+
+    [Fact]
+    public void DeleteRecords_WithSpacedConditionColumn_ReturnsDeletedCount()
+    {
+        CreateWeirdProductsTable();
+        SeedWeirdProducts();
+        var result = _tools.DeleteRecords(
+            "WeirdProducts",
+            new Dictionary<string, object> { ["Display Name"] = "Star Fruit" });
+        Assert.Contains("1 record(s) successfully deleted", result);
     }
 
     // ── ExecuteQuery ────────────────────────────────────────────────────────

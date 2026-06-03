@@ -60,9 +60,12 @@ jobs:
           if [ "$STATUS" = "200" ]; then
             echo "already_published=true" >> $GITHUB_OUTPUT
             echo "Version $VERSION is already published — skipping deploy."
-          else
+          elif [ "$STATUS" = "404" ]; then
             echo "already_published=false" >> $GITHUB_OUTPUT
             echo "Version $VERSION is new — will deploy."
+          else
+            echo "Failed to determine whether version $VERSION is published (HTTP $STATUS)." >&2
+            exit 1
           fi
 
   deploy:

@@ -20,6 +20,9 @@ namespace SqliteMcp
         // Validates that tableName exists in sqlite_master to prevent SQL injection via table names.
         private void ValidateTableName(string tableName)
         {
+            if (tableName.StartsWith("sqlite_", StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException($"Table '{tableName}' is a SQLite system table and cannot be accessed.");
+
             using var command = _sqliteConnection.CreateCommand();
             command.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=@tableName";
             command.Parameters.AddWithValue("@tableName", tableName);
@@ -30,6 +33,9 @@ namespace SqliteMcp
 
         private static string QuoteIdentifier(string name) =>
             $"[{name.Replace("]", "]]")}]";
+
+        private static string CreateParameterName(string prefix, int index) =>
+            $"@{prefix}{index}";
 
         [McpServerTool(Destructive = false, ReadOnly = true, Name = "db_info")]
         [Description("Get information about the SQLite database including path, existence, size, and table count")]
@@ -141,14 +147,15 @@ namespace SqliteMcp
                 EnsureOpen();
                 ValidateTableName(tableName);
 
-                var columns = string.Join(", ", columnValues.Keys.Select(QuoteIdentifier));
-                var parameters = string.Join(", ", columnValues.Keys.Select(k => "@" + k));
+                var entries = columnValues.ToList();
+                var columns = string.Join(", ", entries.Select(entry => QuoteIdentifier(entry.Key)));
+                var parameters = string.Join(", ", entries.Select((_, index) => CreateParameterName("p", index)));
 
                 using var command = _sqliteConnection.CreateCommand();
                 command.CommandText = $"INSERT INTO {QuoteIdentifier(tableName)} ({columns}) VALUES ({parameters});";
-                foreach (var kvp in columnValues)
+                foreach (var (kvp, index) in entries.Select((entry, index) => (entry, index)))
                 {
-                    command.Parameters.AddWithValue("@" + kvp.Key, kvp.Value);
+                    command.Parameters.AddWithValue(CreateParameterName("p", index), kvp.Value);
                 }
 
                 int rowsAffected = command.ExecuteNonQuery();
@@ -173,16 +180,22 @@ namespace SqliteMcp
                 EnsureOpen();
                 ValidateTableName(tableName);
 
+                if (limit < 0)
+                    throw new ArgumentOutOfRangeException(nameof(limit), "Limit must be non-negative.");
+                if (offset < 0)
+                    throw new ArgumentOutOfRangeException(nameof(offset), "Offset must be non-negative.");
+
                 string query = $"SELECT * FROM {QuoteIdentifier(tableName)}";
 
                 using var command = _sqliteConnection.CreateCommand();
                 if (conditions != null && conditions.Count > 0)
                 {
-                    var whereClauses = conditions.Keys.Select(k => $"{QuoteIdentifier(k)} = @cond_{k}");
+                    var conditionEntries = conditions.ToList();
+                    var whereClauses = conditionEntries.Select((entry, index) => $"{QuoteIdentifier(entry.Key)} = {CreateParameterName("c", index)}");
                     query += " WHERE " + string.Join(" AND ", whereClauses);
-                    foreach (var kvp in conditions)
+                    foreach (var (kvp, index) in conditionEntries.Select((entry, index) => (entry, index)))
                     {
-                        command.Parameters.AddWithValue("@cond_" + kvp.Key, kvp.Value);
+                        command.Parameters.AddWithValue(CreateParameterName("c", index), kvp.Value);
                     }
                 }
                 query += $" LIMIT {limit} OFFSET {offset};";
@@ -218,16 +231,18 @@ namespace SqliteMcp
                 EnsureOpen();
                 ValidateTableName(tableName);
 
-                var setClauses = string.Join(", ", columnValues.Keys.Select(k => $"{QuoteIdentifier(k)} = @set_{k}"));
-                var whereClauses = conditions.Keys.Select(k => $"{QuoteIdentifier(k)} = @cond_{k}");
+                var setEntries = columnValues.ToList();
+                var conditionEntries = conditions.ToList();
+                var setClauses = string.Join(", ", setEntries.Select((entry, index) => $"{QuoteIdentifier(entry.Key)} = {CreateParameterName("s", index)}"));
+                var whereClauses = conditionEntries.Select((entry, index) => $"{QuoteIdentifier(entry.Key)} = {CreateParameterName("c", index)}");
 
                 using var command = _sqliteConnection.CreateCommand();
                 command.CommandText = $"UPDATE {QuoteIdentifier(tableName)} SET {setClauses} WHERE {string.Join(" AND ", whereClauses)};";
 
-                foreach (var kvp in columnValues)
-                    command.Parameters.AddWithValue("@set_" + kvp.Key, kvp.Value);
-                foreach (var kvp in conditions)
-                    command.Parameters.AddWithValue("@cond_" + kvp.Key, kvp.Value);
+                foreach (var (kvp, index) in setEntries.Select((entry, index) => (entry, index)))
+                    command.Parameters.AddWithValue(CreateParameterName("s", index), kvp.Value);
+                foreach (var (kvp, index) in conditionEntries.Select((entry, index) => (entry, index)))
+                    command.Parameters.AddWithValue(CreateParameterName("c", index), kvp.Value);
 
                 int rowsAffected = command.ExecuteNonQuery();
                 _sqliteConnection.Close();
@@ -251,13 +266,14 @@ namespace SqliteMcp
                 EnsureOpen();
                 ValidateTableName(tableName);
 
-                var whereClauses = conditions.Keys.Select(k => $"{QuoteIdentifier(k)} = @cond_{k}");
+                var conditionEntries = conditions.ToList();
+                var whereClauses = conditionEntries.Select((entry, index) => $"{QuoteIdentifier(entry.Key)} = {CreateParameterName("c", index)}");
 
                 using var command = _sqliteConnection.CreateCommand();
                 command.CommandText = $"DELETE FROM {QuoteIdentifier(tableName)} WHERE {string.Join(" AND ", whereClauses)};";
 
-                foreach (var kvp in conditions)
-                    command.Parameters.AddWithValue("@cond_" + kvp.Key, kvp.Value);
+                foreach (var (kvp, index) in conditionEntries.Select((entry, index) => (entry, index)))
+                    command.Parameters.AddWithValue(CreateParameterName("c", index), kvp.Value);
 
                 int rowsAffected = command.ExecuteNonQuery();
                 _sqliteConnection.Close();
