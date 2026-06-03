@@ -34,6 +34,9 @@ namespace SqliteMcp
         private static string QuoteIdentifier(string name) =>
             $"[{name.Replace("]", "]]")}]";
 
+        private static string QuoteStringLiteral(string value) =>
+            $"'{value.Replace("'", "''")}'";
+
         private static string CreateParameterName(string prefix, int index) =>
             $"@{prefix}{index}";
 
@@ -110,8 +113,7 @@ namespace SqliteMcp
                 string schema = string.Empty;
                 using (var command = _sqliteConnection.CreateCommand())
                 {
-                    command.CommandText = "SELECT * FROM pragma_table_info(@tableName);";
-                    command.Parameters.AddWithValue("@tableName", tableName);
+                    command.CommandText = $"SELECT * FROM pragma_table_info({QuoteStringLiteral(tableName)});";
                     using var reader = command.ExecuteReader();
                     if (!reader.HasRows)
                     {
