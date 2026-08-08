@@ -81,7 +81,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Create issue with Copilot review
-        run: gh issue create --title "Copilot Review: $GITHUB_SHA" --body-file /tmp/copilot_review.txt
+        run: |
+          gh issue create --title "Copilot Review: $GITHUB_SHA" --body-file /tmp/copilot_review.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   deploy:
