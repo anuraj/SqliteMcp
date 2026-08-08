@@ -2,6 +2,7 @@ name: .NET
 permissions:
   contents: read
   copilot-requests: write
+  issues: write
 on:
   push:
     branches: [main]
@@ -80,11 +81,7 @@ jobs:
         run: |
           ISSUE_TITLE="Copilot Review: $GITHUB_SHA"
           ISSUE_BODY="$REVIEW"
-          curl -s -X POST \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            -d "{\"title\": \"$ISSUE_TITLE\", \"body\": \"$ISSUE_BODY\"}" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/issues"
+          gh issue create --title "$ISSUE_TITLE" --body "$ISSUE_BODY"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   deploy:
