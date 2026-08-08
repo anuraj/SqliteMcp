@@ -76,6 +76,16 @@ jobs:
         run: copilot --yolo -p "Review the changes in this commit for bugs, security issues, and logic errors. Be specific about line numbers and provide detailed explanations for any issues found."
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # How to create issue and set the title and body of the issue using the output from the copilot command
+      - name: Create issue with Copilot output
+        uses: peter-evans/create-issue-from-file@v4
+        with:
+          title: "Copilot Review: ${{ github.sha }}"
+          content-filepath: copilot_output.txt
+          labels: "bug, security, logic"
+          content: |
+            The following issues were found by Copilot in commit ${{ github.sha }}:
+            ${{ steps.copilot.outputs.stdout }}
   deploy:
     runs-on: ubuntu-latest
     needs: ci
