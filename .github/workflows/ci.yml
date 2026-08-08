@@ -80,7 +80,7 @@ jobs:
         run: |
           ISSUE_TITLE="Copilot Review: $GITHUB_SHA"
           ISSUE_BODY="$REVIEW"
-          gh issue create --title "$ISSUE_TITLE" --body "$ISSUE_BODY" --table "bug,security,logic" --label "copilot-review"
+          gh issue create --title "$ISSUE_TITLE" --body "$ISSUE_BODY" --label "copilot-review"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   deploy:
