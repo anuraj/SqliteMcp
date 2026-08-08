@@ -1,6 +1,7 @@
 name: .NET
 permissions:
   contents: read
+  copilot-requests: write
 on:
   push:
     branches: [main]
@@ -69,7 +70,12 @@ jobs:
             echo "Failed to determine whether version $VERSION is published (HTTP $STATUS)." >&2
             exit 1
           fi
-
+      - name: Install Copilot CLI
+        run: npm install -g @github/copilot
+      - name: Run Copilot
+        run: copilot --yolo -p "Review the changes in this commit for bugs, security issues, and logic errors. Be specific about line numbers and provide detailed explanations for any issues found."
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   deploy:
     runs-on: ubuntu-latest
     needs: ci
