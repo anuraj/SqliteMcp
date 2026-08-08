@@ -73,10 +73,17 @@ jobs:
           fi
       - name: Install Copilot CLI
         run: npm install -g @github/copilot
-      - name: Run Copilot and create issue
+      - name: Run Copilot review
+        id: copilot
         run: |
+          set -e
           REVIEW=$(copilot --yolo -p "Review the changes in this commit for bugs, security issues, and logic errors. Be specific about line numbers and provide detailed explanations for any issues found.")
-          gh issue create --title "Copilot Review: $GITHUB_SHA" --body "$REVIEW"
+          [[ -n "$REVIEW" ]] || { echo "Copilot returned empty output" >&2; exit 1; }
+          { echo "review<<EOF"; echo "$REVIEW"; echo "EOF"; } >> $GITHUB_OUTPUT
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create issue with Copilot review
+        run: gh issue create --title "Copilot Review: $GITHUB_SHA" --body "${{ steps.copilot.outputs.review }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   deploy:
