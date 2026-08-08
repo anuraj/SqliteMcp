@@ -73,15 +73,10 @@ jobs:
           fi
       - name: Install Copilot CLI
         run: npm install -g @github/copilot
-      - name: Run Copilot
-        run: REVIEW=$(copilot --yolo -p "Review the changes in this commit for bugs, security issues, and logic errors. Be specific about line numbers and provide detailed explanations for any issues found.")
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Create issue with Copilot output
+      - name: Run Copilot and create issue
         run: |
-          ISSUE_TITLE="Copilot Review: $GITHUB_SHA"
-          ISSUE_BODY="$REVIEW"
-          gh issue create --title "$ISSUE_TITLE" --body "$ISSUE_BODY"
+          REVIEW=$(copilot --yolo -p "Review the changes in this commit for bugs, security issues, and logic errors. Be specific about line numbers and provide detailed explanations for any issues found.")
+          gh issue create --title "Copilot Review: $GITHUB_SHA" --body "$REVIEW"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   deploy:
