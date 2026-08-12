@@ -1,7 +1,7 @@
 {
   "manifest_version": "0.2",
   "name": "SqliteMcp",
-  "version": "1.0.4",
+  "version": "1.0.6",
   "description": "MCP server for SQLite database operations",
   "long_description": "MCP server for SQLite database operations. Enables AI agents and LLMs to interact with SQLite databases through a standardized MCP interface.",
   "author": {
