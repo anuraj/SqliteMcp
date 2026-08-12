@@ -30,10 +30,10 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Restore dependencies
-        run: dotnet restore SqliteMcp.sln
+        run: dotnet restore SqliteMcp.slnx
 
       - name: Build
-        run: dotnet build SqliteMcp.sln --no-restore
+        run: dotnet build SqliteMcp.slnx --no-restore
 
       - name: Test with code coverage
         run: |
