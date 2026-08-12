@@ -14,7 +14,6 @@ public class ToolsTests : IDisposable
 {
     private readonly string _dbName = Guid.NewGuid().ToString("N");
     private readonly SqliteConnection _keeper;
-    private readonly SqliteConnection _connection;
     private readonly Tools _tools;
 
     public ToolsTests()
@@ -22,13 +21,11 @@ public class ToolsTests : IDisposable
         var connStr = $"Data Source={_dbName};Mode=Memory;Cache=Shared";
         _keeper = new SqliteConnection(connStr);
         _keeper.Open();
-        _connection = new SqliteConnection(connStr);
-        _tools = new Tools(_connection);
+        _tools = new Tools(() => new SqliteConnection(connStr));
     }
 
     public void Dispose()
     {
-        _connection.Dispose();
         _keeper.Dispose();
     }
 

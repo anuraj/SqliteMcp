@@ -1,5 +1,4 @@
 using System.ComponentModel;
-using System.Data;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using ModelContextProtocol.Server;
@@ -7,32 +6,37 @@ using ModelContextProtocol.Server;
 namespace SqliteMcp
 {
     [McpServerToolType]
-    public class Tools(SqliteConnection sqliteConnection)
+    public class Tools(Func<SqliteConnection> connectionFactory)
     {
-        private readonly SqliteConnection _sqliteConnection = sqliteConnection;
+        private readonly Func<SqliteConnection> _connectionFactory = connectionFactory;
 
-        private void EnsureOpen()
+        private SqliteConnection CreateOpenConnection()
         {
-            if (_sqliteConnection.State == ConnectionState.Closed)
-                _sqliteConnection.Open();
+            var connection = _connectionFactory();
+            connection.Open();
+            return connection;
         }
 
         // Validates that tableName exists in sqlite_master to prevent SQL injection via table names.
-        private void ValidateTableName(string tableName)
+        private static void ValidateTableName(SqliteConnection connection, string tableName)
         {
             if (tableName.StartsWith("sqlite_", StringComparison.OrdinalIgnoreCase))
+            {
                 throw new ArgumentException($"Table '{tableName}' is a SQLite system table and cannot be accessed.");
+            }
 
-            using var command = _sqliteConnection.CreateCommand();
+            using var command = connection.CreateCommand();
             command.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=@tableName";
             command.Parameters.AddWithValue("@tableName", tableName);
             var count = Convert.ToInt32(command.ExecuteScalar());
             if (count == 0)
+            {
                 throw new ArgumentException($"Table '{tableName}' does not exist.");
+            }
         }
 
         private static string QuoteIdentifier(string name) =>
-            $"[{name.Replace("]", "]]")}]";
+            $"[{name.Replace("]", "]]" )}]";
 
         private static string QuoteStringLiteral(string value) =>
             $"'{value.Replace("'", "''")}'";
@@ -46,19 +50,17 @@ namespace SqliteMcp
         {
             try
             {
-                var databasePath = _sqliteConnection.DataSource;
+                using var connection = CreateOpenConnection();
+                var databasePath = connection.DataSource;
                 bool exists = File.Exists(databasePath);
                 long sizeInBytes = exists ? new FileInfo(databasePath).Length : 0;
 
-                EnsureOpen();
-
-                int tableCount = 0;
-                using (var command = _sqliteConnection.CreateCommand())
+                int tableCount;
+                using (var command = connection.CreateCommand())
                 {
                     command.CommandText = "SELECT count(name) FROM sqlite_master WHERE type='table';";
                     tableCount = Convert.ToInt32(command.ExecuteScalar());
                 }
-                _sqliteConnection.Close();
 
                 return $"Database Path: {databasePath}\n" +
                     $"Exists: {exists}\n" +
@@ -77,10 +79,10 @@ namespace SqliteMcp
         {
             try
             {
-                EnsureOpen();
+                using var connection = CreateOpenConnection();
 
                 List<string> tables = [];
-                using (var command = _sqliteConnection.CreateCommand())
+                using (var command = connection.CreateCommand())
                 {
                     command.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'";
                     using var reader = command.ExecuteReader();
@@ -89,7 +91,6 @@ namespace SqliteMcp
                         tables.Add(reader.GetString(0));
                     }
                 }
-                _sqliteConnection.Close();
 
                 return tables.Count > 0
                     ? string.Join("\n", tables)
@@ -107,11 +108,11 @@ namespace SqliteMcp
         {
             try
             {
-                EnsureOpen();
-                ValidateTableName(tableName);
+                using var connection = CreateOpenConnection();
+                ValidateTableName(connection, tableName);
 
                 string schema = string.Empty;
-                using (var command = _sqliteConnection.CreateCommand())
+                using (var command = connection.CreateCommand())
                 {
                     command.CommandText = $"SELECT * FROM pragma_table_info({QuoteStringLiteral(tableName)});";
                     using var reader = command.ExecuteReader();
@@ -130,7 +131,6 @@ namespace SqliteMcp
                                   $"{reader.GetInt32(5)}\n";
                     }
                 }
-                _sqliteConnection.Close();
 
                 return schema;
             }
@@ -146,14 +146,14 @@ namespace SqliteMcp
         {
             try
             {
-                EnsureOpen();
-                ValidateTableName(tableName);
+                using var connection = CreateOpenConnection();
+                ValidateTableName(connection, tableName);
 
                 var entries = columnValues.ToList();
                 var columns = string.Join(", ", entries.Select(entry => QuoteIdentifier(entry.Key)));
                 var parameters = string.Join(", ", entries.Select((_, index) => CreateParameterName("p", index)));
 
-                using var command = _sqliteConnection.CreateCommand();
+                using var command = connection.CreateCommand();
                 command.CommandText = $"INSERT INTO {QuoteIdentifier(tableName)} ({columns}) VALUES ({parameters});";
                 foreach (var (kvp, index) in entries.Select((entry, index) => (entry, index)))
                 {
@@ -161,7 +161,6 @@ namespace SqliteMcp
                 }
 
                 int rowsAffected = command.ExecuteNonQuery();
-                _sqliteConnection.Close();
 
                 return rowsAffected > 0
                     ? $"Record successfully created in table '{tableName}'."
@@ -179,17 +178,21 @@ namespace SqliteMcp
         {
             try
             {
-                EnsureOpen();
-                ValidateTableName(tableName);
+                using var connection = CreateOpenConnection();
+                ValidateTableName(connection, tableName);
 
                 if (limit < 0)
+                {
                     throw new ArgumentOutOfRangeException(nameof(limit), "Limit must be non-negative.");
+                }
                 if (offset < 0)
+                {
                     throw new ArgumentOutOfRangeException(nameof(offset), "Offset must be non-negative.");
+                }
 
                 string query = $"SELECT * FROM {QuoteIdentifier(tableName)}";
 
-                using var command = _sqliteConnection.CreateCommand();
+                using var command = connection.CreateCommand();
                 if (conditions != null && conditions.Count > 0)
                 {
                     var conditionEntries = conditions.ToList();
@@ -214,7 +217,6 @@ namespace SqliteMcp
                     }
                     results.Add(row);
                 }
-                _sqliteConnection.Close();
 
                 return JsonSerializer.Serialize(results);
             }
@@ -230,24 +232,27 @@ namespace SqliteMcp
         {
             try
             {
-                EnsureOpen();
-                ValidateTableName(tableName);
+                using var connection = CreateOpenConnection();
+                ValidateTableName(connection, tableName);
 
                 var setEntries = columnValues.ToList();
                 var conditionEntries = conditions.ToList();
                 var setClauses = string.Join(", ", setEntries.Select((entry, index) => $"{QuoteIdentifier(entry.Key)} = {CreateParameterName("s", index)}"));
                 var whereClauses = conditionEntries.Select((entry, index) => $"{QuoteIdentifier(entry.Key)} = {CreateParameterName("c", index)}");
 
-                using var command = _sqliteConnection.CreateCommand();
+                using var command = connection.CreateCommand();
                 command.CommandText = $"UPDATE {QuoteIdentifier(tableName)} SET {setClauses} WHERE {string.Join(" AND ", whereClauses)};";
 
                 foreach (var (kvp, index) in setEntries.Select((entry, index) => (entry, index)))
+                {
                     command.Parameters.AddWithValue(CreateParameterName("s", index), kvp.Value);
+                }
                 foreach (var (kvp, index) in conditionEntries.Select((entry, index) => (entry, index)))
+                {
                     command.Parameters.AddWithValue(CreateParameterName("c", index), kvp.Value);
+                }
 
                 int rowsAffected = command.ExecuteNonQuery();
-                _sqliteConnection.Close();
 
                 return rowsAffected > 0
                     ? $"{rowsAffected} record(s) successfully updated in table '{tableName}'."
@@ -265,20 +270,21 @@ namespace SqliteMcp
         {
             try
             {
-                EnsureOpen();
-                ValidateTableName(tableName);
+                using var connection = CreateOpenConnection();
+                ValidateTableName(connection, tableName);
 
                 var conditionEntries = conditions.ToList();
                 var whereClauses = conditionEntries.Select((entry, index) => $"{QuoteIdentifier(entry.Key)} = {CreateParameterName("c", index)}");
 
-                using var command = _sqliteConnection.CreateCommand();
+                using var command = connection.CreateCommand();
                 command.CommandText = $"DELETE FROM {QuoteIdentifier(tableName)} WHERE {string.Join(" AND ", whereClauses)};";
 
                 foreach (var (kvp, index) in conditionEntries.Select((entry, index) => (entry, index)))
+                {
                     command.Parameters.AddWithValue(CreateParameterName("c", index), kvp.Value);
+                }
 
                 int rowsAffected = command.ExecuteNonQuery();
-                _sqliteConnection.Close();
 
                 return rowsAffected > 0
                     ? $"{rowsAffected} record(s) successfully deleted from table '{tableName}'."
@@ -296,9 +302,9 @@ namespace SqliteMcp
         {
             try
             {
-                EnsureOpen();
+                using var connection = CreateOpenConnection();
 
-                using var command = _sqliteConnection.CreateCommand();
+                using var command = connection.CreateCommand();
                 command.CommandText = sqlQuery;
 
                 if (parameters != null)
@@ -312,7 +318,6 @@ namespace SqliteMcp
                 if (!sqlQuery.TrimStart().StartsWith("SELECT", StringComparison.OrdinalIgnoreCase))
                 {
                     int rowsAffected = command.ExecuteNonQuery();
-                    _sqliteConnection.Close();
                     return $"{rowsAffected} row(s) affected.";
                 }
 
@@ -327,7 +332,6 @@ namespace SqliteMcp
                     }
                     results.Add(row);
                 }
-                _sqliteConnection.Close();
 
                 return results.Count > 0
                     ? JsonSerializer.Serialize(results)

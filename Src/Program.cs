@@ -9,7 +9,8 @@ var databasePath = Environment.GetEnvironmentVariable("SQLITE_DB_PATH") ??
     builder.Configuration["SQLITE_DB_PATH"] ??
     throw new InvalidOperationException("Environment variable SQLITE_DB_PATH is not set.");
 
-builder.Services.AddSingleton(new SqliteConnection($"Data Source={databasePath}"));
+var connectionString = $"Data Source={databasePath}";
+builder.Services.AddSingleton<Func<SqliteConnection>>(_ => () => new SqliteConnection(connectionString));
 
 builder.Logging.AddConsole(consoleLogOptions =>
 {

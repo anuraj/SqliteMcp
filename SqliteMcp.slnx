@@ -1,0 +1,12 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/Src/" />
+  <Folder Name="/Tests/">
+    <Project Path="Tests/SqliteMcp.Tests/SqliteMcp.Tests.csproj" />
+  </Folder>
+  <Project Path="Src/SqliteMcp.csproj" />
+</Solution>
