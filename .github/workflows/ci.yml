@@ -78,13 +78,30 @@ jobs:
           set -euo pipefail
           copilot --silent --yolo -p "Review the changes in this commit for bugs, security issues, and logic errors. Respond with ONLY a JSON array and no other text or markdown fences. Each element must be an object with exactly these keys: title, filename, lineNumber, issue, impact, recommendation, severity. 'title' must read like a GitHub issue title: a short imperative sentence under 70 characters that names the concrete problem (e.g. 'Validate table name before interpolating into SQL'), never a file path or a severity label. 'issue' explains the problem, 'impact' explains the consequence, 'recommendation' explains how to fix it. 'severity' is one of critical, high, medium, low. Return an empty array if there are no findings." > /tmp/copilot_review.txt
           [[ -s /tmp/copilot_review.txt ]] || { echo "Copilot returned empty output" >&2; exit 1; }
-          # Drop any markdown code fences the model may still emit
-          sed 's/^[[:space:]]*```\(json\)\?[[:space:]]*$//' /tmp/copilot_review.txt > /tmp/copilot_review.json
-          jq -e 'type == "array"' /tmp/copilot_review.json > /dev/null || {
-            echo "Copilot output was not a JSON array:" >&2
-            cat /tmp/copilot_review.txt >&2
-            exit 1
-          }
+          # Copilot often wraps the array in prose and/or code fences, so extract the JSON array
+          python3 - <<'PY'
+          import json, re, sys
+
+          raw = open("/tmp/copilot_review.txt", encoding="utf-8", errors="replace").read()
+          fenced = re.findall(r"```(?:json)?\s*(.*?)```", raw, re.S)
+          decoder = json.JSONDecoder()
+
+          for text in fenced + [raw]:
+              for candidate in (text, re.sub(r",(\s*[}\]])", r"\1", text)):
+                  for start in (m.start() for m in re.finditer(r"\[", candidate)):
+                      try:
+                          data, _ = decoder.raw_decode(candidate[start:])
+                      except ValueError:
+                          continue
+                      if isinstance(data, list):
+                          with open("/tmp/copilot_review.json", "w", encoding="utf-8") as out:
+                              json.dump(data, out)
+                          sys.exit(0)
+
+          print("Could not find a JSON array in Copilot output:", file=sys.stderr)
+          print(raw, file=sys.stderr)
+          sys.exit(1)
+          PY
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Create an issue per Copilot review finding
