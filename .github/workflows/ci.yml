@@ -76,7 +76,7 @@ jobs:
       - name: Run Copilot review
         run: |
           set -euo pipefail
-          copilot --silent --yolo -p "Review the changes in this commit for bugs, security issues, and logic errors. Be specific about line numbers and provide detailed explanations for any issues found. Respond with ONLY a JSON array and no other text or markdown fences. Each element must be an object with exactly these keys: filename, lineNumber, issue, impact, severity. Return an empty array if there are no findings." > /tmp/copilot_review.txt
+          copilot --silent --yolo -p "Review the changes in this commit for bugs, security issues, and logic errors. Respond with ONLY a JSON array and no other text or markdown fences. Each element must be an object with exactly these keys: title, filename, lineNumber, issue, impact, recommendation, severity. 'title' must read like a GitHub issue title: a short imperative sentence under 70 characters that names the concrete problem (e.g. 'Validate table name before interpolating into SQL'), never a file path or a severity label. 'issue' explains the problem, 'impact' explains the consequence, 'recommendation' explains how to fix it. 'severity' is one of critical, high, medium, low. Return an empty array if there are no findings." > /tmp/copilot_review.txt
           [[ -s /tmp/copilot_review.txt ]] || { echo "Copilot returned empty output" >&2; exit 1; }
           # Drop any markdown code fences the model may still emit
           sed 's/^[[:space:]]*```\(json\)\?[[:space:]]*$//' /tmp/copilot_review.txt > /tmp/copilot_review.json
@@ -92,23 +92,23 @@ jobs:
           set -euo pipefail
           COUNT=$(jq 'length' /tmp/copilot_review.json)
           echo "Copilot reported $COUNT finding(s)."
+          PERMALINK_BASE="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/blob/$GITHUB_SHA"
           for i in $(seq 0 $((COUNT - 1))); do
-            FILENAME=$(jq -r --argjson i "$i" '.[$i].filename // "unknown"' /tmp/copilot_review.json)
-            LINE=$(jq -r --argjson i "$i" '.[$i].lineNumber // "?" | tostring' /tmp/copilot_review.json)
-            SEVERITY=$(jq -r --argjson i "$i" '.[$i].severity // "Unspecified"' /tmp/copilot_review.json)
-            BODY=$(jq -r --argjson i "$i" --arg sha "$GITHUB_SHA" '
+            TITLE=$(jq -r --argjson i "$i" '.[$i].title // .[$i].issue // "Copilot review finding" | split("\n")[0][0:70]' /tmp/copilot_review.json)
+            BODY=$(jq -r --argjson i "$i" --arg sha "$GITHUB_SHA" --arg base "$PERMALINK_BASE" '
               .[$i] |
-              "| Field | Value |\n|---|---|\n" +
-              "| Filename | \(.filename // "unknown") |\n" +
-              "| Line number | \(.lineNumber // "?") |\n" +
-              "| Severity | \(.severity // "Unspecified") |\n" +
-              "| Impact | \(.impact // "Not provided") |\n\n" +
-              "### Issue\n\n\(.issue // "Not provided")\n\n" +
-              "_Reported by Copilot review for commit \($sha)._"
+              (.filename // "unknown") as $file |
+              (.lineNumber // "?" | tostring) as $line |
+              "### Summary\n\n\(.issue // "Not provided")\n\n" +
+              "### Location\n\n" +
+              (if $file == "unknown" then "Not provided\n\n"
+               else "[\($file):\($line)](\($base)/\($file)#L\($line))\n\n" end) +
+              "### Impact\n\n\(.impact // "Not provided")\n\n" +
+              "### Suggested fix\n\n\(.recommendation // "Not provided")\n\n" +
+              "### Severity\n\n\(.severity // "Unspecified")\n\n---\n\n" +
+              "_Automatically reported by the Copilot review step for commit \($sha)._"
             ' /tmp/copilot_review.json)
-            gh issue create \
-              --title "Copilot Review [$SEVERITY]: $FILENAME:$LINE" \
-              --body "$BODY"
+            gh issue create --title "$TITLE" --body "$BODY"
           done
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
