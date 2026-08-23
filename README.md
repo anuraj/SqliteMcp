@@ -44,17 +44,18 @@ SqliteMcp/
 
 ### Installation
 
-1. Clone the repository:
-   ```bash
-  git clone https://github.com/anuraj/SqliteMcp.git
-   cd SqliteMcp
-   ```
+#### Clone the repository:
 
-2. Restore dependencies and build:
-   ```bash
-   dotnet restore
-   dotnet build
-   ```
+```bash
+git clone https://github.com/anuraj/SqliteMcp.git
+cd SqliteMcp
+```
+
+#### Restore dependencies and build:
+```bash
+dotnet restore
+dotnet build
+```
 
 ### Running the Server
 
