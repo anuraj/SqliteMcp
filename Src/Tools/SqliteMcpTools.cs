@@ -346,7 +346,7 @@ namespace SqliteMcp.Tools
             }
         }
 
-        [McpServerTool(Name = "execution_plan")]
+        [McpServerTool(Destructive = false, ReadOnly = true,Name = "execution_plan")]
         [McpAppUi(ResourceUri = "ui://sqlite-app/execution-plan")]
         [Description("Get the execution plan for a SQL query.")]
         public async Task<CallToolResult> ExecutionPlan([Description("SQL query to get the execution plan for")] string sqlQuery)

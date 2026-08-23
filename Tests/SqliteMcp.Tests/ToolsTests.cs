@@ -381,4 +381,35 @@ public class ToolsTests : IDisposable
         Assert.Single(rows);
         Assert.Equal("Cherry", rows[0]["Name"].GetString());
     }
+
+    // ── ExecutionPlan ──────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task ExecutionPlan_SelectQuery_ReturnsTextAndStructuredPlan()
+    {
+        CreateProductsTable();
+
+        var result = await _tools.ExecutionPlan("SELECT * FROM Products WHERE Id = 1");
+
+        Assert.NotNull(result.Content);
+        var text = Assert.IsType<ModelContextProtocol.Protocol.TextContentBlock>(result.Content[0]).Text;
+        Assert.Contains("Execution plan for query: SELECT * FROM Products WHERE Id = 1", text);
+
+        Assert.True(result.StructuredContent.HasValue);
+        var structured = result.StructuredContent.Value;
+        Assert.Equal("SELECT * FROM Products WHERE Id = 1", structured.GetProperty("query").GetString());
+        var planRows = structured.GetProperty("results").EnumerateArray().ToList();
+        Assert.NotEmpty(planRows);
+        Assert.Contains("Products", planRows[0].GetProperty("detail").GetString());
+    }
+
+    [Fact]
+    public async Task ExecutionPlan_InvalidQuery_ReturnsErrorContent()
+    {
+        var result = await _tools.ExecutionPlan("SELECT * FROM MissingTable");
+
+        var text = Assert.IsType<ModelContextProtocol.Protocol.TextContentBlock>(result.Content[0]).Text;
+        Assert.StartsWith("Error getting execution plan:", text);
+        Assert.False(result.StructuredContent.HasValue);
+    }
 }
