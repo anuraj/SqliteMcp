@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sqlite Execution Plan</title>
+  <style>
+    :root {
+      --bg: #f7f9fc;
+      --card: #ffffff;
+      --text: #0f2749;
+      --muted: #4b607c;
+      --border: #d9e2ef;
+
+      --scan: #b85c00;
+      --scan-soft: #fff5e8;
+
+      --search: #007f66;
+      --search-soft: #ebfffa;
+
+      --temp-btree: #7c3aed;
+      --temp-btree-soft: #f3e8ff;
+
+      --multi-index-or: #0e7490;
+      --multi-index-or-soft: #ecfeff;
+
+      --compound: #1d4ed8;
+      --compound-soft: #eff6ff;
+
+      --coroutine: #be123c;
+      --coroutine-soft: #fff1f2;
+
+      --materialize: #b45309;
+      --materialize-soft: #fffbeb;
+
+      --subquery: #4d7c0f;
+      --subquery-soft: #f7fee7;
+
+      --auto-index: #334155;
+      --auto-index-soft: #f8fafc;
+
+      --other: #6b7280;
+      --other-soft: #f9fafb;
+
+      --primary: #2563eb;
+      --input-border: #cfd8e6;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+    }
+
+    .wrapper {
+      max-width: 1100px;
+      margin: 20px auto;
+      padding: 0 12px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 24px;
+      font-weight: 800;
+    }
+
+    .sub {
+      margin: 0 0 16px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .query-box {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 14px;
+    }
+
+    label {
+      display: block;
+      font-family: Consolas, monospace;
+      font-size: 13px;
+      color: #4b5563;
+      margin-bottom: 6px;
+    }
+
+    textarea {
+      width: 100%;
+      font-family: Consolas, monospace;
+      font-size: 13.5px;
+      padding: 10px;
+      border: 1px solid var(--input-border);
+      border-radius: 8px;
+      resize: vertical;
+      min-height: 100px;
+      background: #fff;
+      color: #111827;
+      outline: none;
+    }
+
+    textarea:focus {
+      border-color: #7aa2f7;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    }
+
+    button {
+      margin-top: 10px;
+      font-family: Consolas, monospace;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      padding: 9px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      filter: brightness(0.96);
+    }
+
+    button:disabled {
+      background: #cfd8e6;
+      cursor: not-allowed;
+    }
+
+    #resultContainer {
+      margin-top: 14px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .empty-state {
+      background: var(--card);
+      border: 1px dashed var(--border);
+      border-radius: 12px;
+      color: var(--muted);
+      padding: 14px;
+      font-size: 14px;
+    }
+
+    .item {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 14px;
+      box-shadow: 0 2px 6px rgba(15, 39, 73, .05);
+      transition: transform .12s ease, box-shadow .12s ease;
+    }
+
+    .item:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 10px rgba(15, 39, 73, .08);
+    }
+
+    .row-top {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+
+    .chip {
+      font-size: 12px;
+      font-weight: 800;
+      color: #fff;
+      border-radius: 999px;
+      padding: 4px 10px;
+      line-height: 1;
+      letter-spacing: .2px;
+    }
+
+    .detail {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 19px;
+      font-weight: 700;
+      color: #0d2341;
+      margin: 0;
+      word-break: break-word;
+    }
+
+    .hint {
+      margin: 0;
+      display: block;
+      font-size: 15px;
+      line-height: 1.6;
+      border-radius: 8px;
+      padding: 8px 10px;
+      border: 1px solid transparent;
+    }
+
+    .item.scan {
+      border-left-color: var(--scan);
+    }
+
+    .chip.scan {
+      background: var(--scan);
+    }
+
+    .hint.scan {
+      background: var(--scan-soft);
+      border-color: #f1c282;
+      color: #9a4c00;
+    }
+
+    .item.search {
+      border-left-color: var(--search);
+    }
+
+    .chip.search {
+      background: var(--search);
+    }
+
+    .hint.search {
+      background: var(--search-soft);
+      border-color: #9adfce;
+      color: #006a55;
+    }
+
+    .item.temp-btree {
+      border-left-color: var(--temp-btree);
+    }
+
+    .chip.temp-btree {
+      background: var(--temp-btree);
+    }
+
+    .hint.temp-btree {
+      background: var(--temp-btree-soft);
+      border-color: #d8b4fe;
+      color: #6d28d9;
+    }
+
+    .item.multi-index-or {
+      border-left-color: var(--multi-index-or);
+    }
+
+    .chip.multi-index-or {
+      background: var(--multi-index-or);
+    }
+
+    .hint.multi-index-or {
+      background: var(--multi-index-or-soft);
+      border-color: #a5f3fc;
+      color: #155e75;
+    }
+
+    .item.compound {
+      border-left-color: var(--compound);
+    }
+
+    .chip.compound {
+      background: var(--compound);
+    }
+
+    .hint.compound {
+      background: var(--compound-soft);
+      border-color: #bfdbfe;
+      color: #1e40af;
+    }
+
+    .item.coroutine {
+      border-left-color: var(--coroutine);
+    }
+
+    .chip.coroutine {
+      background: var(--coroutine);
+    }
+
+    .hint.coroutine {
+      background: var(--coroutine-soft);
+      border-color: #fecdd3;
+      color: #9f1239;
+    }
+
+    .item.materialize {
+      border-left-color: var(--materialize);
+    }
+
+    .chip.materialize {
+      background: var(--materialize);
+    }
+
+    .hint.materialize {
+      background: var(--materialize-soft);
+      border-color: #fde68a;
+      color: #92400e;
+    }
+
+    .item.subquery {
+      border-left-color: var(--subquery);
+    }
+
+    .chip.subquery {
+      background: var(--subquery);
+    }
+
+    .hint.subquery {
+      background: var(--subquery-soft);
+      border-color: #d9f99d;
+      color: #3f6212;
+    }
+
+    .item.auto-index {
+      border-left-color: var(--auto-index);
+    }
+
+    .chip.auto-index {
+      background: var(--auto-index);
+    }
+
+    .hint.auto-index {
+      background: var(--auto-index-soft);
+      border-color: #cbd5e1;
+      color: #334155;
+    }
+
+    .item.other {
+      border-left-color: var(--other);
+    }
+
+    .chip.other {
+      background: var(--other);
+    }
+
+    .hint.other {
+      background: var(--other-soft);
+      border-color: #e5e7eb;
+      color: #4b5563;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrapper">
+    <h1>Query plan — EXPLAIN QUERY PLAN</h1>
+    <p class="sub">Visual execution strategy for your SQL query.</p>
+
+    <div class="query-box">
+      <label for="sqlQueryInput">SQL Query</label>
+      <textarea id="sqlQueryInput" rows="4" required oninput="sqlQueryInput_change()"></textarea>
+      <button id="executeButton" type="button" onclick="explainQueryPlan()">Run &amp; Explain</button>
+    </div>
+
+    <div id="resultContainer">
+      <div class="empty-state">Run a query to see the execution plan.</div>
+    </div>
+  </div>
+
+  <script>
+    function sqlQueryInput_change() {
+      const btn = document.getElementById('executeButton');
+      const sqlQuery = document.getElementById("sqlQueryInput").value.trim();
+      btn.disabled = !sqlQuery;
+    }
+
+    function pick(obj, keys) {
+      for (const k of keys) {
+        if (obj[k] !== undefined && obj[k] !== null) return obj[k];
+      }
+      return null;
+    }
+
+    function classifyPlanStep(detail) {
+      const d = (detail || "").toUpperCase();
+
+      if (d.includes("USE TEMP B-TREE")) return "temp-btree";
+      if (d.includes("MULTI-INDEX OR")) return "multi-index-or";
+      if (d.includes("COMPOUND QUERY")) return "compound";
+      if (d.includes("CO-ROUTINE")) return "coroutine";
+      if (d.includes("MATERIALIZE")) return "materialize";
+      if (d.includes("SUBQUERY")) return "subquery";
+      if (d.includes("AUTOMATIC INDEX")) return "auto-index";
+      if (d.startsWith("SCAN") || d.includes(" SCAN ")) return "scan";
+      if (d.startsWith("SEARCH") || d.includes(" SEARCH ")) return "search";
+
+      return "other";
+    }
+
+    function labelForType(type) {
+      switch (type) {
+        case "temp-btree": return "TEMP B-TREE";
+        case "multi-index-or": return "MULTI-INDEX OR";
+        case "compound": return "COMPOUND";
+        case "coroutine": return "CO-ROUTINE";
+        case "materialize": return "MATERIALIZE";
+        case "subquery": return "SUBQUERY";
+        case "auto-index": return "AUTO INDEX";
+        case "scan": return "SCAN";
+        case "search": return "SEARCH";
+        default: return "STEP";
+      }
+    }
+
+    function extractScanTarget(detail) {
+      const m = detail.match(/\bSCAN\s+(?:TABLE\s+)?([^\s]+)/i);
+      return m ? m[1] : null;
+    }
+
+    function extractSearchParts(detail) {
+      const m = detail.match(/\bSEARCH\s+([^\s]+)\s+USING\s+(.+)$/i);
+      if (!m) return null;
+      return { target: m[1], usingPart: m[2] };
+    }
+
+    function extractIndexName(usingPart) {
+      const m = usingPart.match(/\bINDEX\s+([^\s(]+)/i);
+      return m ? m[1] : null;
+    }
+
+    function extractConstraintTerms(detail) {
+      const m = detail.match(/\(([^)]*)\)/);
+      if (!m) return [];
+      return m[1]
+        .split(/\s+AND\s+/i)
+        .map(s => s.trim())
+        .filter(Boolean);
+    }
+
+    function explainDetail(detail, index) {
+      const d = (detail || "").toUpperCase();
+      const kind = classifyPlanStep(detail);
+      const loopNote = index === 0
+        ? "This is usually an outer-loop step."
+        : `This is usually an inner-loop step (level ${index + 1}).`;
+
+      switch (kind) {
+        case "scan": {
+          const target = extractScanTarget(detail) || "table/source";
+          return `Full table scan of "${target}": SQLite reads rows sequentially and applies filters row by row. ${loopNote} On larger tables, this often indicates that a helpful index is missing or cannot be used for this query shape.`;
+        }
+
+        case "search": {
+          const p = extractSearchParts(detail);
+          const target = p?.target || "table/source";
+          const usingPart = p?.usingPart || "";
+          const isPk = /\bINTEGER PRIMARY KEY\b/i.test(usingPart);
+          const idx = extractIndexName(usingPart);
+          const constraints = extractConstraintTerms(detail);
+          const isLeftJoinRight = /\bLEFT-JOIN\b/i.test(detail);
+          const usesAutoIndex = /\bAUTOMATIC INDEX\b/i.test(detail);
+
+          let accessText = `Targeted lookup on "${target}"`;
+          if (isPk) accessText += ` using INTEGER PRIMARY KEY`;
+          else if (idx) accessText += ` using index "${idx}"`;
+          else if (usesAutoIndex) accessText += ` using an automatic index`;
+          else accessText += ` using indexed access`;
+
+          const constraintText = constraints.length
+            ? ` The lookup constraints are: ${constraints.join(", ")}.`
+            : "";
+
+          const joinText = isLeftJoinRight
+            ? ` Marked LEFT-JOIN: this is on the right side of a LEFT JOIN, so unmatched rows still preserve the left-side row with NULLs for right-side columns.`
+            : "";
+
+          return `${accessText}. SQLite avoids scanning all rows and jumps directly to matches. ${loopNote}${constraintText}${joinText}`;
+        }
+
+        case "temp-btree":
+          if (d.includes("ORDER BY")) {
+            return `Temporary B-tree for ORDER BY: SQLite performs an explicit sort because no suitable index already provides the requested order. A matching index on the ORDER BY columns can often remove this sort cost.`;
+          }
+          if (d.includes("GROUP BY")) {
+            return `Temporary B-tree for GROUP BY: SQLite creates an intermediate grouped/sorted structure (in memory or temp storage). An index aligned with GROUP BY columns may allow faster streaming aggregation.`;
+          }
+          if (d.includes("DISTINCT")) {
+            return `Temporary B-tree for DISTINCT: SQLite builds an intermediate structure to eliminate duplicates. A supporting index can reduce or eliminate this extra work.`;
+          }
+          return `Temporary B-tree step: SQLite creates intermediate sorted/grouped storage to continue query processing.`;
+
+        case "multi-index-or":
+          return `MULTI-INDEX OR strategy: SQLite evaluates OR-connected predicates using multiple index probes and merges the matching row sets, often avoiding a full table scan.`;
+
+        case "compound":
+          return `Compound query step: SQLite is combining branches of UNION / UNION ALL / INTERSECT / EXCEPT and coordinating how intermediate results are merged.`;
+
+        case "coroutine":
+          return `Co-routine step: SQLite executes part of the plan as a producer/consumer pipeline, yielding rows between internal sub-operations.`;
+
+        case "materialize":
+          return `Materialize step: SQLite stores an intermediate result set temporarily before continuing. This can happen when a subquery/result must be reused or processed in a fixed order.`;
+
+        case "subquery":
+          return `Subquery step: SQLite executes a nested SELECT and feeds those results into the outer query.`;
+
+        case "auto-index":
+          return `Automatic index step: SQLite may build or use a transient index for this statement. It can help immediately, but for repeated workloads a permanent index is usually better.`;
+
+        default:
+          return `General plan step: an internal SQLite operation that contributes to result generation.`;
+      }
+    }
+
+    function renderGenericPlan(payload) {
+      const container = document.getElementById("resultContainer");
+      container.innerHTML = "";
+
+      const rows = payload?.results ?? [];
+      if (!rows.length) {
+        container.innerHTML = `<div class="empty-state">No execution plan rows returned.</div>`;
+        return;
+      }
+
+      rows.forEach((row, idx) => {
+        const detail = String(pick(row, ["detail", "Detail"]) ?? JSON.stringify(row));
+        const parent = Number(pick(row, ["parent", "Parent"])) || 0;
+        const type = classifyPlanStep(detail);
+
+        const item = document.createElement("div");
+        item.className = `item ${type}`;
+        item.style.marginLeft = `${Math.min(Math.max(0, parent) * 16, 48)}px`;
+
+        item.innerHTML = `
+          <div class="row-top">
+            <span class="chip ${type}">${labelForType(type)}</span>
+            <p class="detail">${detail}</p>
+          </div>
+          <p class="hint ${type}">${explainDetail(detail, idx)}</p>
+        `;
+
+        container.appendChild(item);
+      });
+    }
+
+    let nextRequestId = 1;
+    const pendingRequests = new Map();
+
+    window.addEventListener("message", (event) => {
+      const msg = event.data;
+      if (!msg || msg.jsonrpc !== "2.0") return;
+
+      if (msg.id !== undefined && pendingRequests.has(msg.id)) {
+        const { resolve, reject } = pendingRequests.get(msg.id);
+        pendingRequests.delete(msg.id);
+        msg.error ? reject(new Error(msg.error.message || JSON.stringify(msg.error))) : resolve(msg.result);
+        return;
+      }
+
+      if (msg.method === "ui/notifications/tool-input") handleToolInput(msg.params);
+      if (msg.method === "ui/notifications/tool-result") handleToolResult(msg.params);
+    });
+
+    async function explainQueryPlan() {
+      const btn = document.getElementById('executeButton');
+      btn.disabled = true;
+      const sqlQuery = document.getElementById("sqlQueryInput").value.trim();
+      if (!sqlQuery) {
+        btn.disabled = false;
+        return;
+      }
+
+      try {
+        const result = await sendRequest('tools/call', {
+          name: 'execution_plan',
+          arguments: { sqlQuery: sqlQuery }
+        });
+        handleToolResult(result);
+      } catch (error) {
+        console.error("Error executing query plan:", error);
+        const container = document.getElementById("resultContainer");
+        container.innerHTML = `<div class="empty-state">Error: ${error.message}</div>`;
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function handleToolInput(params) {
+      console.log("Received tool input:", params);
+    }
+
+    function handleToolResult(params) {
+      console.log("Received tool result:", params);
+      const structuredContent = params.structuredContent;
+      if (!structuredContent) return;
+      document.getElementById("sqlQueryInput").value = structuredContent.query || "";
+      renderGenericPlan(structuredContent);
+      sqlQueryInput_change();
+    }
+
+    function sendRequest(method, params) {
+      const id = nextRequestId++;
+      return new Promise((resolve, reject) => {
+        pendingRequests.set(id, { resolve, reject });
+        window.parent.postMessage({ jsonrpc: "2.0", id, method, params: params || {} }, "*");
+      });
+    }
+
+    function sendNotification(method, params) {
+      window.parent.postMessage({ jsonrpc: "2.0", method, params: params || {} }, "*");
+    }
+
+    async function initialize() {
+      if (window.parent === window) {
+        console.error("This UI must be loaded by an MCP app host.");
+        return;
+      }
+
+      await sendRequest("ui/initialize", {
+        protocolVersion: "2025-11-25",
+        appInfo: { name: "sqlite-mcp-server", version: "1.0.0" },
+        appCapabilities: {},
+      });
+
+      sendNotification("ui/notifications/initialized", {});
+      sqlQueryInput_change();
+    }
+
+    initialize();
+  </script>
+</body>
+
+</html>

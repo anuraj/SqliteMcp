@@ -2,6 +2,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using ModelContextProtocol.Extensions.Apps;
+using ModelContextProtocol.Protocol;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -18,8 +20,18 @@ builder.Logging.AddConsole(consoleLogOptions =>
 });
 
 builder.Services
-    .AddMcpServer()
+    .AddMcpServer(options =>
+    {
+        options.ServerInfo = new Implementation { Name = "Sqlite MCP Server", Version = "1.0.0" };
+        options.Capabilities = new ServerCapabilities
+        {
+            Tools = new ToolsCapability(),
+            Resources = new ResourcesCapability(),
+        };
+    })
     .WithStdioServerTransport()
-    .WithToolsFromAssembly();
+    .WithToolsFromAssembly()
+    .WithResourcesFromAssembly()
+    .WithMcpApps();
 
 await builder.Build().RunAsync();

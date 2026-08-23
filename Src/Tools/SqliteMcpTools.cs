@@ -1,12 +1,15 @@
 using System.ComponentModel;
+using System.Data.Common;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
+using ModelContextProtocol.Extensions.Apps;
+using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 
-namespace SqliteMcp
+namespace SqliteMcp.Tools
 {
     [McpServerToolType]
-    public class Tools(Func<SqliteConnection> connectionFactory)
+    public sealed class SqliteMcpTools(Func<SqliteConnection> connectionFactory)
     {
         private readonly Func<SqliteConnection> _connectionFactory = connectionFactory;
 
@@ -18,7 +21,7 @@ namespace SqliteMcp
         }
 
         // Validates that tableName exists in sqlite_master to prevent SQL injection via table names.
-        private static void ValidateTableName(SqliteConnection connection, string tableName)
+        private void ValidateTableName(SqliteConnection connection, string tableName)
         {
             if (tableName.StartsWith("sqlite_", StringComparison.OrdinalIgnoreCase))
             {
@@ -35,13 +38,13 @@ namespace SqliteMcp
             }
         }
 
-        private static string QuoteIdentifier(string name) =>
-            $"[{name.Replace("]", "]]" )}]";
+        private string QuoteIdentifier(string name) =>
+            $"[{name.Replace("]", "]]")}]";
 
-        private static string QuoteStringLiteral(string value) =>
+        private string QuoteStringLiteral(string value) =>
             $"'{value.Replace("'", "''")}'";
 
-        private static string CreateParameterName(string prefix, int index) =>
+        private string CreateParameterName(string prefix, int index) =>
             $"@{prefix}{index}";
 
         [McpServerTool(Destructive = false, ReadOnly = true, Name = "db_info")]
@@ -340,6 +343,50 @@ namespace SqliteMcp
             catch (Exception ex)
             {
                 return $"Error executing query: {ex.Message}";
+            }
+        }
+
+        [McpServerTool(Name = "execution_plan")]
+        [McpAppUi(ResourceUri = "ui://sqlite-app/execution-plan")]
+        [Description("Get the execution plan for a SQL query.")]
+        public async Task<CallToolResult> ExecutionPlan([Description("SQL query to get the execution plan for")] string sqlQuery)
+        {
+            try
+            {
+                using var connection = CreateOpenConnection();
+
+                using var command = connection.CreateCommand();
+                command.CommandText = $"EXPLAIN QUERY PLAN {sqlQuery}";
+
+                using var reader = command.ExecuteReader();
+                var results = new List<Dictionary<string, object>>();
+                while (reader.Read())
+                {
+                    var row = new Dictionary<string, object>();
+                    for (int i = 0; i < reader.FieldCount; i++)
+                    {
+                        row[reader.GetName(i)] = reader.GetValue(i);
+                    }
+                    results.Add(row);
+                }
+
+                return new CallToolResult
+                {
+                    Content = [new TextContentBlock { Text = $"Execution plan for query: {sqlQuery}" }],
+                    StructuredContent = JsonSerializer.SerializeToElement(new
+                    {
+                        query = sqlQuery,
+                        columns = results.FirstOrDefault()?.Keys ?? default,
+                        results
+                    })
+                };
+            }
+            catch (Exception ex)
+            {
+                return new CallToolResult
+                {
+                    Content = [new TextContentBlock { Text = $"Error getting execution plan: {ex.Message}" }],
+                };
             }
         }
     }

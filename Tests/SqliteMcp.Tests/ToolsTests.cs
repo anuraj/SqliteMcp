@@ -1,6 +1,5 @@
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
-using SqliteMcp;
 using Xunit;
 
 namespace SqliteMcp.Tests;
@@ -14,14 +13,14 @@ public class ToolsTests : IDisposable
 {
     private readonly string _dbName = Guid.NewGuid().ToString("N");
     private readonly SqliteConnection _keeper;
-    private readonly Tools _tools;
+    private readonly Tools.SqliteMcpTools _tools;
 
     public ToolsTests()
     {
         var connStr = $"Data Source={_dbName};Mode=Memory;Cache=Shared";
         _keeper = new SqliteConnection(connStr);
         _keeper.Open();
-        _tools = new Tools(() => new SqliteConnection(connStr));
+        _tools = new Tools.SqliteMcpTools(() => new SqliteConnection(connStr));
     }
 
     public void Dispose()
