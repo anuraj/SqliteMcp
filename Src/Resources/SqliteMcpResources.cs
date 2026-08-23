@@ -7,7 +7,9 @@ namespace SqliteMcp.Resources
     [McpServerResourceType]
     public sealed class SqliteMcpResources
     {
-        private static readonly string UiDir = Path.Combine(AppContext.BaseDirectory, "ui");
+        // Matches the "UI" folder casing preserved by the Content item in SqliteMcp.csproj;
+        // must stay in sync since Linux file systems are case-sensitive.
+        private static readonly string UiDir = Path.Combine(AppContext.BaseDirectory, "UI");
 
         [McpServerResource(UriTemplate = "ui://sqlite-app/execution-plan", Name = "sqlite-exec-plan-ui", MimeType = McpApps.HtmlMimeType)]
         [McpMeta("ui", """{"csp":{"connectDomains":[]},"prefersBorder":true}""")]
