@@ -38,7 +38,6 @@ jobs:
       - name: Test with code coverage
         run: |
           dotnet test Tests/SqliteMcp.Tests/SqliteMcp.Tests.csproj \
-            --no-build \
             --collect:"XPlat Code Coverage" \
             --results-directory ./coverage
 
