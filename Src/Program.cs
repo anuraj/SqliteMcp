@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Extensions.Apps;
+using ModelContextProtocol.Extensions.Tasks;
 using ModelContextProtocol.Protocol;
 
 var builder = Host.CreateApplicationBuilder(args);
@@ -13,6 +14,8 @@ var databasePath = Environment.GetEnvironmentVariable("SQLITE_DB_PATH") ??
 
 var connectionString = $"Data Source={databasePath}";
 builder.Services.AddSingleton<Func<SqliteConnection>>(_ => () => new SqliteConnection(connectionString));
+
+var store = new InMemoryMcpTaskStore { DefaultPollIntervalMs = 250 };
 
 builder.Logging.AddConsole(consoleLogOptions =>
 {
@@ -32,6 +35,7 @@ builder.Services
     .WithStdioServerTransport()
     .WithToolsFromAssembly()
     .WithResourcesFromAssembly()
+    .WithTasks(store)
     .WithMcpApps();
 
 await builder.Build().RunAsync();

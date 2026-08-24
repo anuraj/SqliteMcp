@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Threading;
 using Microsoft.Data.Sqlite;
 using Xunit;
 
@@ -50,10 +51,10 @@ public class ToolsTests : IDisposable
     // ── GetDatabaseInfo ─────────────────────────────────────────────────────
 
     [Fact]
-    public void GetDatabaseInfo_ReturnsFormattedOutput()
+    public async Task GetDatabaseInfo_ReturnsFormattedOutput()
     {
         CreateProductsTable();
-        var result = _tools.GetDatabaseInfo();
+        var result = await _tools.GetDatabaseInfo(CancellationToken.None);
         Assert.Contains("Database Path:", result);
         Assert.Contains("Exists:", result);
         Assert.Contains("Size (bytes):", result);
@@ -61,124 +62,124 @@ public class ToolsTests : IDisposable
     }
 
     [Fact]
-    public void GetDatabaseInfo_ReturnsCorrectTableCount()
+    public async Task GetDatabaseInfo_ReturnsCorrectTableCount()
     {
         CreateProductsTable();
         Execute("CREATE TABLE IF NOT EXISTS Orders (Id INTEGER PRIMARY KEY)");
-        var result = _tools.GetDatabaseInfo();
+        var result = await _tools.GetDatabaseInfo(CancellationToken.None);
         Assert.Contains("Table Count: 2", result);
     }
 
     // ── ListTables ──────────────────────────────────────────────────────────
 
     [Fact]
-    public void ListTables_EmptyDatabase_ReturnsNoTablesMessage()
+    public async Task ListTables_EmptyDatabase_ReturnsNoTablesMessage()
     {
-        var result = _tools.ListTables();
+        var result = await _tools.ListTables(CancellationToken.None);
         Assert.Equal("No tables found in the database.", result);
     }
 
     [Fact]
-    public void ListTables_WithTables_ReturnsTableNames()
+    public async Task ListTables_WithTables_ReturnsTableNames()
     {
         CreateProductsTable();
         Execute("CREATE TABLE IF NOT EXISTS Orders (Id INTEGER PRIMARY KEY)");
-        var result = _tools.ListTables();
+        var result = await _tools.ListTables(CancellationToken.None);
         Assert.Contains("Products", result);
         Assert.Contains("Orders", result);
     }
 
     [Fact]
-    public void ListTables_ExcludesSystemTables()
+    public async Task ListTables_ExcludesSystemTables()
     {
         CreateProductsTable();
-        var result = _tools.ListTables();
+        var result = await _tools.ListTables(CancellationToken.None);
         Assert.DoesNotContain("sqlite_", result);
     }
 
     // ── GetTableSchema ──────────────────────────────────────────────────────
 
     [Fact]
-    public void GetTableSchema_ValidTable_ReturnsSchemaWithColumns()
+    public async Task GetTableSchema_ValidTable_ReturnsSchemaWithColumns()
     {
         CreateProductsTable();
-        var result = _tools.GetTableSchema("Products");
+        var result = await _tools.GetTableSchema("Products", CancellationToken.None);
         Assert.Contains("Schema for table 'Products':", result);
         Assert.Contains("Name", result);
         Assert.Contains("Price", result);
     }
 
     [Fact]
-    public void GetTableSchema_NonExistentTable_ReturnsError()
+    public async Task GetTableSchema_NonExistentTable_ReturnsError()
     {
-        var result = _tools.GetTableSchema("NonExistent");
+        var result = await _tools.GetTableSchema("NonExistent", CancellationToken.None);
         Assert.Contains("does not exist", result);
     }
 
     [Fact]
-    public void GetTableSchema_SystemTable_ReturnsError()
+    public async Task GetTableSchema_SystemTable_ReturnsError()
     {
         CreateProductsTable();
-        var result = _tools.GetTableSchema("sqlite_master");
+        var result = await _tools.GetTableSchema("sqlite_master", CancellationToken.None);
         Assert.Contains("system table", result);
     }
 
     // ── CreateRecord ────────────────────────────────────────────────────────
 
     [Fact]
-    public void CreateRecord_ValidData_ReturnsSuccessMessage()
+    public async Task CreateRecord_ValidData_ReturnsSuccessMessage()
     {
         CreateProductsTable();
-        var result = _tools.CreateRecord("Products", new Dictionary<string, object>
+        var result = await _tools.CreateRecord("Products", new Dictionary<string, object>
         {
             ["Name"] = "Mango",
             ["Price"] = 2.49
-        });
+        }, CancellationToken.None);
         Assert.Contains("successfully created", result);
         Assert.Contains("Products", result);
     }
 
     [Fact]
-    public void CreateRecord_NonExistentTable_ReturnsError()
+    public async Task CreateRecord_NonExistentTable_ReturnsError()
     {
-        var result = _tools.CreateRecord("Ghost", new Dictionary<string, object>
+        var result = await _tools.CreateRecord("Ghost", new Dictionary<string, object>
         {
             ["Name"] = "X"
-        });
+        }, CancellationToken.None);
         Assert.Contains("Error", result);
     }
 
     [Fact]
-    public void CreateRecord_WithSpacedColumnName_ReturnsSuccessMessage()
+    public async Task CreateRecord_WithSpacedColumnName_ReturnsSuccessMessage()
     {
         CreateWeirdProductsTable();
-        var result = _tools.CreateRecord("WeirdProducts", new Dictionary<string, object>
+        var result = await _tools.CreateRecord("WeirdProducts", new Dictionary<string, object>
         {
             ["Display Name"] = "Passion Fruit",
             ["Unit Price"] = 6.79
-        });
+        }, CancellationToken.None);
         Assert.Contains("successfully created", result);
     }
 
     // ── ReadRecords ─────────────────────────────────────────────────────────
 
     [Fact]
-    public void ReadRecords_NoConditions_ReturnsAllRows()
+    public async Task ReadRecords_NoConditions_ReturnsAllRows()
     {
         CreateProductsTable();
         SeedProducts();
-        var result = _tools.ReadRecords("Products");
+        var result = await _tools.ReadRecords("Products", CancellationToken.None);
         var rows = JsonSerializer.Deserialize<List<Dictionary<string, JsonElement>>>(result);
         Assert.NotNull(rows);
         Assert.Equal(3, rows.Count);
     }
 
     [Fact]
-    public void ReadRecords_WithConditions_ReturnsFilteredRows()
+    public async Task ReadRecords_WithConditions_ReturnsFilteredRows()
     {
         CreateProductsTable();
         SeedProducts();
-        var result = _tools.ReadRecords("Products", new Dictionary<string, object> { ["Name"] = "Apple" });
+        var result = await _tools.ReadRecords("Products", CancellationToken.None, new Dictionary<string, object> { ["Name"] = "Apple" });
         var rows = JsonSerializer.Deserialize<List<Dictionary<string, JsonElement>>>(result);
         Assert.NotNull(rows);
         Assert.Single(rows);
@@ -186,25 +187,25 @@ public class ToolsTests : IDisposable
     }
 
     [Fact]
-    public void ReadRecords_WithLimit_RespectsLimit()
+    public async Task ReadRecords_WithLimit_RespectsLimit()
     {
         CreateProductsTable();
         SeedProducts();
-        var result = _tools.ReadRecords("Products", limit: 2);
+        var result = await _tools.ReadRecords("Products", CancellationToken.None, limit: 2);
         var rows = JsonSerializer.Deserialize<List<Dictionary<string, JsonElement>>>(result);
         Assert.NotNull(rows);
         Assert.Equal(2, rows.Count);
     }
 
     [Fact]
-    public void ReadRecords_WithOffset_RespectsOffset()
+    public async Task ReadRecords_WithOffset_RespectsOffset()
     {
         CreateProductsTable();
         SeedProducts();
-        var all = _tools.ReadRecords("Products");
+        var all = await _tools.ReadRecords("Products", CancellationToken.None);
         var allRows = JsonSerializer.Deserialize<List<Dictionary<string, JsonElement>>>(all)!;
 
-        var result = _tools.ReadRecords("Products", offset: 1);
+        var result = await _tools.ReadRecords("Products", CancellationToken.None, offset: 1);
         var rows = JsonSerializer.Deserialize<List<Dictionary<string, JsonElement>>>(result);
         Assert.NotNull(rows);
         Assert.Equal(2, rows.Count);
@@ -212,18 +213,18 @@ public class ToolsTests : IDisposable
     }
 
     [Fact]
-    public void ReadRecords_NonExistentTable_ReturnsError()
+    public async Task ReadRecords_NonExistentTable_ReturnsError()
     {
-        var result = _tools.ReadRecords("Ghost");
+        var result = await _tools.ReadRecords("Ghost", CancellationToken.None);
         Assert.Contains("Error", result);
     }
 
     [Fact]
-    public void ReadRecords_WithSpacedConditionColumn_ReturnsFilteredRows()
+    public async Task ReadRecords_WithSpacedConditionColumn_ReturnsFilteredRows()
     {
         CreateWeirdProductsTable();
         SeedWeirdProducts();
-        var result = _tools.ReadRecords("WeirdProducts", new Dictionary<string, object> { ["Display Name"] = "Dragon Fruit" });
+        var result = await _tools.ReadRecords("WeirdProducts", CancellationToken.None, new Dictionary<string, object> { ["Display Name"] = "Dragon Fruit" });
         var rows = JsonSerializer.Deserialize<List<Dictionary<string, JsonElement>>>(result);
         Assert.NotNull(rows);
         Assert.Single(rows);
@@ -231,150 +232,159 @@ public class ToolsTests : IDisposable
     }
 
     [Fact]
-    public void ReadRecords_NegativeLimit_ReturnsError()
+    public async Task ReadRecords_NegativeLimit_ReturnsError()
     {
         CreateProductsTable();
-        var result = _tools.ReadRecords("Products", limit: -1);
+        var result = await _tools.ReadRecords("Products", CancellationToken.None, limit: -1);
         Assert.Contains("Limit must be non-negative", result);
     }
 
     [Fact]
-    public void ReadRecords_NegativeOffset_ReturnsError()
+    public async Task ReadRecords_NegativeOffset_ReturnsError()
     {
         CreateProductsTable();
-        var result = _tools.ReadRecords("Products", offset: -1);
+        var result = await _tools.ReadRecords("Products", CancellationToken.None, offset: -1);
         Assert.Contains("Offset must be non-negative", result);
     }
 
     // ── UpdateRecords ───────────────────────────────────────────────────────
 
     [Fact]
-    public void UpdateRecords_MatchingRows_ReturnsUpdatedCount()
+    public async Task UpdateRecords_MatchingRows_ReturnsUpdatedCount()
     {
         CreateProductsTable();
         SeedProducts();
-        var result = _tools.UpdateRecords(
+        var result = await _tools.UpdateRecords(
             "Products",
             new Dictionary<string, object> { ["Price"] = 9.99 },
-            new Dictionary<string, object> { ["Name"] = "Apple" });
+            new Dictionary<string, object> { ["Name"] = "Apple" },
+            CancellationToken.None);
         Assert.Contains("1 record(s) successfully updated", result);
     }
 
     [Fact]
-    public void UpdateRecords_NoMatchingRows_ReturnsNoRecordsMessage()
+    public async Task UpdateRecords_NoMatchingRows_ReturnsNoRecordsMessage()
     {
         CreateProductsTable();
         SeedProducts();
-        var result = _tools.UpdateRecords(
+        var result = await _tools.UpdateRecords(
             "Products",
             new Dictionary<string, object> { ["Price"] = 0.0 },
-            new Dictionary<string, object> { ["Name"] = "Durian" });
+            new Dictionary<string, object> { ["Name"] = "Durian" },
+            CancellationToken.None);
         Assert.Contains("No records updated", result);
     }
 
     [Fact]
-    public void UpdateRecords_NonExistentTable_ReturnsError()
+    public async Task UpdateRecords_NonExistentTable_ReturnsError()
     {
-        var result = _tools.UpdateRecords(
+        var result = await _tools.UpdateRecords(
             "Ghost",
             new Dictionary<string, object> { ["Name"] = "X" },
-            new Dictionary<string, object> { ["Id"] = 1 });
+            new Dictionary<string, object> { ["Id"] = 1 },
+            CancellationToken.None);
         Assert.Contains("Error", result);
     }
 
     [Fact]
-    public void UpdateRecords_WithSpacedColumnNames_ReturnsUpdatedCount()
+    public async Task UpdateRecords_WithSpacedColumnNames_ReturnsUpdatedCount()
     {
         CreateWeirdProductsTable();
         SeedWeirdProducts();
-        var result = _tools.UpdateRecords(
+        var result = await _tools.UpdateRecords(
             "WeirdProducts",
             new Dictionary<string, object> { ["Unit Price"] = 7.25 },
-            new Dictionary<string, object> { ["Display Name"] = "Dragon Fruit" });
+            new Dictionary<string, object> { ["Display Name"] = "Dragon Fruit" },
+            CancellationToken.None);
         Assert.Contains("1 record(s) successfully updated", result);
     }
 
     // ── DeleteRecords ───────────────────────────────────────────────────────
 
     [Fact]
-    public void DeleteRecords_MatchingRows_ReturnsDeletedCount()
+    public async Task DeleteRecords_MatchingRows_ReturnsDeletedCount()
     {
         CreateProductsTable();
         SeedProducts();
-        var result = _tools.DeleteRecords(
+        var result = await _tools.DeleteRecords(
             "Products",
-            new Dictionary<string, object> { ["Name"] = "Banana" });
+            new Dictionary<string, object> { ["Name"] = "Banana" },
+            CancellationToken.None);
         Assert.Contains("1 record(s) successfully deleted", result);
     }
 
     [Fact]
-    public void DeleteRecords_NoMatchingRows_ReturnsNoRecordsMessage()
+    public async Task DeleteRecords_NoMatchingRows_ReturnsNoRecordsMessage()
     {
         CreateProductsTable();
         SeedProducts();
-        var result = _tools.DeleteRecords(
+        var result = await _tools.DeleteRecords(
             "Products",
-            new Dictionary<string, object> { ["Name"] = "Papaya" });
+            new Dictionary<string, object> { ["Name"] = "Papaya" },
+            CancellationToken.None);
         Assert.Contains("No records deleted", result);
     }
 
     [Fact]
-    public void DeleteRecords_NonExistentTable_ReturnsError()
+    public async Task DeleteRecords_NonExistentTable_ReturnsError()
     {
-        var result = _tools.DeleteRecords(
+        var result = await _tools.DeleteRecords(
             "Ghost",
-            new Dictionary<string, object> { ["Id"] = 1 });
+            new Dictionary<string, object> { ["Id"] = 1 },
+            CancellationToken.None);
         Assert.Contains("Error", result);
     }
 
     [Fact]
-    public void DeleteRecords_WithSpacedConditionColumn_ReturnsDeletedCount()
+    public async Task DeleteRecords_WithSpacedConditionColumn_ReturnsDeletedCount()
     {
         CreateWeirdProductsTable();
         SeedWeirdProducts();
-        var result = _tools.DeleteRecords(
+        var result = await _tools.DeleteRecords(
             "WeirdProducts",
-            new Dictionary<string, object> { ["Display Name"] = "Star Fruit" });
+            new Dictionary<string, object> { ["Display Name"] = "Star Fruit" },
+            CancellationToken.None);
         Assert.Contains("1 record(s) successfully deleted", result);
     }
 
     // ── ExecuteQuery ────────────────────────────────────────────────────────
 
     [Fact]
-    public void ExecuteQuery_SelectWithResults_ReturnsJsonArray()
+    public async Task ExecuteQuery_SelectWithResults_ReturnsJsonArray()
     {
         CreateProductsTable();
         SeedProducts();
-        var result = _tools.ExecuteQuery("SELECT * FROM Products");
+        var result = await _tools.ExecuteQuery("SELECT * FROM Products", CancellationToken.None);
         var rows = JsonSerializer.Deserialize<List<Dictionary<string, JsonElement>>>(result);
         Assert.NotNull(rows);
         Assert.Equal(3, rows.Count);
     }
 
     [Fact]
-    public void ExecuteQuery_SelectWithNoResults_ReturnsNoResultsMessage()
+    public async Task ExecuteQuery_SelectWithNoResults_ReturnsNoResultsMessage()
     {
         CreateProductsTable();
-        var result = _tools.ExecuteQuery("SELECT * FROM Products WHERE Id = -1");
+        var result = await _tools.ExecuteQuery("SELECT * FROM Products WHERE Id = -1", CancellationToken.None);
         Assert.Equal("Query executed successfully with no results.", result);
     }
 
     [Fact]
-    public void ExecuteQuery_NonSelectStatement_ReturnsRowsAffected()
+    public async Task ExecuteQuery_NonSelectStatement_ReturnsRowsAffected()
     {
         CreateProductsTable();
         SeedProducts();
-        var result = _tools.ExecuteQuery("DELETE FROM Products WHERE Name = 'Apple'");
+        var result = await _tools.ExecuteQuery("DELETE FROM Products WHERE Name = 'Apple'", CancellationToken.None);
         Assert.Contains("row(s) affected", result);
     }
 
     [Fact]
-    public void ExecuteQuery_SelectWithParameters_SubstitutesCorrectly()
+    public async Task ExecuteQuery_SelectWithParameters_SubstitutesCorrectly()
     {
         CreateProductsTable();
         SeedProducts();
-        var result = _tools.ExecuteQuery(
+        var result = await _tools.ExecuteQuery(
             "SELECT * FROM Products WHERE Name = @name",
+            CancellationToken.None,
             new Dictionary<string, object> { ["name"] = "Cherry" });
         var rows = JsonSerializer.Deserialize<List<Dictionary<string, JsonElement>>>(result);
         Assert.NotNull(rows);
@@ -389,7 +399,7 @@ public class ToolsTests : IDisposable
     {
         CreateProductsTable();
 
-        var result = await _tools.ExecutionPlan("SELECT * FROM Products WHERE Id = 1");
+        var result = await _tools.ExecutionPlan("SELECT * FROM Products WHERE Id = 1", CancellationToken.None);
 
         Assert.NotNull(result.Content);
         var text = Assert.IsType<ModelContextProtocol.Protocol.TextContentBlock>(result.Content[0]).Text;
@@ -406,7 +416,7 @@ public class ToolsTests : IDisposable
     [Fact]
     public async Task ExecutionPlan_InvalidQuery_ReturnsErrorContent()
     {
-        var result = await _tools.ExecutionPlan("SELECT * FROM MissingTable");
+        var result = await _tools.ExecutionPlan("SELECT * FROM MissingTable", CancellationToken.None);
 
         var text = Assert.IsType<ModelContextProtocol.Protocol.TextContentBlock>(result.Content[0]).Text;
         Assert.StartsWith("Error getting execution plan:", text);
