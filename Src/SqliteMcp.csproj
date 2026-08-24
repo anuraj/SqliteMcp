@@ -13,7 +13,7 @@
     <PublishSingleFile>true</PublishSingleFile>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageId>SqliteMcp</PackageId>
-    <PackageVersion>1.0.7</PackageVersion>
+    <PackageVersion>1.0.8</PackageVersion>
     <PackageTags>AI; MCP; server; stdio</PackageTags>
     <Description>MCP server for Sqlite database operations.</Description>
     <Authors>Anuraj</Authors>
@@ -23,10 +23,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="ClosedXML" />
     <PackageReference Include="Microsoft.Data.Sqlite" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
     <PackageReference Include="ModelContextProtocol" />
     <PackageReference Include="ModelContextProtocol.Extensions.Apps" />
+    <PackageReference Include="ModelContextProtocol.Extensions.Tasks" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\README.md" Pack="true" PackagePath="/" />
