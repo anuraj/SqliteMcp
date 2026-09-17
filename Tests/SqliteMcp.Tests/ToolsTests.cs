@@ -150,6 +150,16 @@ public class ToolsTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateRecord_EmptyValues_ReturnsError()
+    {
+        CreateProductsTable();
+
+        var result = await _tools.CreateRecord("Products", [], CancellationToken.None);
+
+        Assert.Contains("At least one column value must be provided", result);
+    }
+
+    [Fact]
     public async Task CreateRecord_WithSpacedColumnName_ReturnsSuccessMessage()
     {
         CreateWeirdProductsTable();
@@ -287,6 +297,26 @@ public class ToolsTests : IDisposable
     }
 
     [Fact]
+    public async Task UpdateRecords_EmptyValuesOrConditions_ReturnsError()
+    {
+        CreateProductsTable();
+
+        var emptyValuesResult = await _tools.UpdateRecords(
+            "Products",
+            [],
+            new Dictionary<string, object> { ["Id"] = 1 },
+            CancellationToken.None);
+        var emptyConditionsResult = await _tools.UpdateRecords(
+            "Products",
+            new Dictionary<string, object> { ["Name"] = "Mango" },
+            [],
+            CancellationToken.None);
+
+        Assert.Contains("At least one column value must be provided", emptyValuesResult);
+        Assert.Contains("At least one condition must be provided", emptyConditionsResult);
+    }
+
+    [Fact]
     public async Task UpdateRecords_WithSpacedColumnNames_ReturnsUpdatedCount()
     {
         CreateWeirdProductsTable();
@@ -333,6 +363,21 @@ public class ToolsTests : IDisposable
             new Dictionary<string, object> { ["Id"] = 1 },
             CancellationToken.None);
         Assert.Contains("Error", result);
+    }
+
+    [Fact]
+    public async Task DeleteRecords_EmptyConditions_ReturnsErrorWithoutDeletingRecords()
+    {
+        CreateProductsTable();
+        SeedProducts();
+
+        var result = await _tools.DeleteRecords("Products", [], CancellationToken.None);
+        var records = await _tools.ReadRecords("Products", CancellationToken.None);
+        var rows = JsonSerializer.Deserialize<List<Dictionary<string, JsonElement>>>(records);
+
+        Assert.Contains("At least one condition must be provided", result);
+        Assert.NotNull(rows);
+        Assert.Equal(3, rows.Count);
     }
 
     [Fact]
