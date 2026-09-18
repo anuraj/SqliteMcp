@@ -437,6 +437,72 @@ public class ToolsTests : IDisposable
         Assert.Equal("Cherry", rows[0]["Name"].GetString());
     }
 
+    // ── ExportTablesToExcel ────────────────────────────────────────────────
+
+    [Fact]
+    public async Task ExportTablesToExcel_CreatesDistinctFilesInIsolatedDirectories()
+    {
+        CreateProductsTable();
+        SeedProducts();
+
+        var firstPath = await _tools.ExportTablesToExcel("Products", CancellationToken.None);
+        var secondPath = await _tools.ExportTablesToExcel("Products", CancellationToken.None);
+
+        try
+        {
+            Assert.True(File.Exists(firstPath));
+            Assert.True(File.Exists(secondPath));
+            Assert.NotEqual(Path.GetDirectoryName(firstPath), Path.GetDirectoryName(secondPath));
+            Assert.NotEqual(firstPath, secondPath);
+            Assert.True(new FileInfo(firstPath).Length > 0);
+            Assert.True(new FileInfo(secondPath).Length > 0);
+        }
+        finally
+        {
+            if (File.Exists(firstPath))
+            {
+                Directory.Delete(Path.GetDirectoryName(firstPath)!, recursive: true);
+            }
+
+            if (File.Exists(secondPath))
+            {
+                Directory.Delete(Path.GetDirectoryName(secondPath)!, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ExportTablesToExcel_RemovesExportDirectoryWhenExportFails()
+    {
+        CreateProductsTable();
+        var existingExportDirectories = Directory
+            .EnumerateDirectories(Path.GetTempPath(), "SqliteMcp-*")
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        List<string> newExportDirectories = [];
+
+        try
+        {
+            var result = await _tools.ExportTablesToExcel("Products,MissingTable", CancellationToken.None);
+
+            Assert.StartsWith("Error exporting tables to Excel:", result);
+            newExportDirectories = Directory
+                .EnumerateDirectories(Path.GetTempPath(), "SqliteMcp-*")
+                .Where(path => !existingExportDirectories.Contains(path))
+                .ToList();
+            Assert.Empty(newExportDirectories);
+        }
+        finally
+        {
+            foreach (var directory in newExportDirectories)
+            {
+                if (Directory.Exists(directory))
+                {
+                    Directory.Delete(directory, recursive: true);
+                }
+            }
+        }
+    }
+
     // ── ExecutionPlan ──────────────────────────────────────────────────────
 
     [Fact]

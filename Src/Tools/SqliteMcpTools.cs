@@ -408,6 +408,7 @@ namespace SqliteMcp.Tools
         {
             var tableNames = string.IsNullOrWhiteSpace(tables) ? null : 
                 tables.Split([',', ';']).Select(t => t.Trim()).ToList();
+            DirectoryInfo? exportDirectory = null;
             try
             {
                 using var connection = CreateOpenConnection();
@@ -424,7 +425,8 @@ namespace SqliteMcp.Tools
                     }
                 }
 
-                var excelFilePath = Path.Combine(Path.GetTempPath(), $"SqliteExport_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx");
+                exportDirectory = Directory.CreateTempSubdirectory("SqliteMcp-");
+                var excelFilePath = Path.Combine(exportDirectory.FullName, "export.xlsx");
                 using var workbook = new ClosedXML.Excel.XLWorkbook();
                 foreach (var tableName in tableNames)
                 {
@@ -442,6 +444,18 @@ namespace SqliteMcp.Tools
             }
             catch (Exception ex)
             {
+                if (exportDirectory is not null && Directory.Exists(exportDirectory.FullName))
+                {
+                    try
+                    {
+                        Directory.Delete(exportDirectory.FullName, recursive: true);
+                    }
+                    catch (Exception cleanupException)
+                    {
+                        return $"Error exporting tables to Excel: {ex.Message} Cleanup failed: {cleanupException.Message}";
+                    }
+                }
+
                 return $"Error exporting tables to Excel: {ex.Message}";
             }
         }
