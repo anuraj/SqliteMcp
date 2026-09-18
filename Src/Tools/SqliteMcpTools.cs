@@ -47,6 +47,14 @@ namespace SqliteMcp.Tools
         private string CreateParameterName(string prefix, int index) =>
             $"@{prefix}{index}";
 
+        private static void EnsureNotEmpty(IReadOnlyDictionary<string, object> values, string parameterName, string itemDescription)
+        {
+            if (values.Count == 0)
+            {
+                throw new ArgumentException($"At least one {itemDescription} must be provided.", parameterName);
+            }
+        }
+
         [McpServerTool(Destructive = false, ReadOnly = true, Name = "db_info")]
         [Description("Get information about the SQLite database including path, existence, size, and table count")]
         public async Task<string> GetDatabaseInfo(CancellationToken cancellationToken)
@@ -149,6 +157,7 @@ namespace SqliteMcp.Tools
         {
             try
             {
+                EnsureNotEmpty(columnValues, nameof(columnValues), "column value");
                 using var connection = CreateOpenConnection();
                 await ValidateTableNameAsync(connection, tableName, cancellationToken);
 
@@ -235,6 +244,8 @@ namespace SqliteMcp.Tools
         {
             try
             {
+                EnsureNotEmpty(columnValues, nameof(columnValues), "column value");
+                EnsureNotEmpty(conditions, nameof(conditions), "condition");
                 using var connection = CreateOpenConnection();
                 await ValidateTableNameAsync(connection, tableName, cancellationToken);
 
@@ -273,6 +284,7 @@ namespace SqliteMcp.Tools
         {
             try
             {
+                EnsureNotEmpty(conditions, nameof(conditions), "condition");
                 using var connection = CreateOpenConnection();
                 await ValidateTableNameAsync(connection, tableName, cancellationToken);
 
