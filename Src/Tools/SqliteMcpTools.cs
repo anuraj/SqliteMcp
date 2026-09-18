@@ -424,7 +424,8 @@ namespace SqliteMcp.Tools
                     }
                 }
 
-                var excelFilePath = Path.Combine(Path.GetTempPath(), $"SqliteExport_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx");
+                var exportDirectory = Directory.CreateTempSubdirectory("SqliteMcp-");
+                var excelFilePath = Path.Combine(exportDirectory.FullName, "export.xlsx");
                 using var workbook = new ClosedXML.Excel.XLWorkbook();
                 foreach (var tableName in tableNames)
                 {

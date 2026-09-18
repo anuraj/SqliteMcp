@@ -437,6 +437,40 @@ public class ToolsTests : IDisposable
         Assert.Equal("Cherry", rows[0]["Name"].GetString());
     }
 
+    // ── ExportTablesToExcel ────────────────────────────────────────────────
+
+    [Fact]
+    public async Task ExportTablesToExcel_CreatesDistinctFilesInIsolatedDirectories()
+    {
+        CreateProductsTable();
+        SeedProducts();
+
+        var firstPath = await _tools.ExportTablesToExcel("Products", CancellationToken.None);
+        var secondPath = await _tools.ExportTablesToExcel("Products", CancellationToken.None);
+
+        try
+        {
+            Assert.True(File.Exists(firstPath));
+            Assert.True(File.Exists(secondPath));
+            Assert.NotEqual(Path.GetDirectoryName(firstPath), Path.GetDirectoryName(secondPath));
+            Assert.NotEqual(firstPath, secondPath);
+            Assert.True(new FileInfo(firstPath).Length > 0);
+            Assert.True(new FileInfo(secondPath).Length > 0);
+        }
+        finally
+        {
+            if (File.Exists(firstPath))
+            {
+                Directory.Delete(Path.GetDirectoryName(firstPath)!, recursive: true);
+            }
+
+            if (File.Exists(secondPath))
+            {
+                Directory.Delete(Path.GetDirectoryName(secondPath)!, recursive: true);
+            }
+        }
+    }
+
     // ── ExecutionPlan ──────────────────────────────────────────────────────
 
     [Fact]
