@@ -471,6 +471,38 @@ public class ToolsTests : IDisposable
         }
     }
 
+    [Fact]
+    public async Task ExportTablesToExcel_RemovesExportDirectoryWhenExportFails()
+    {
+        CreateProductsTable();
+        var existingExportDirectories = Directory
+            .EnumerateDirectories(Path.GetTempPath(), "SqliteMcp-*")
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        List<string> newExportDirectories = [];
+
+        try
+        {
+            var result = await _tools.ExportTablesToExcel("Products,MissingTable", CancellationToken.None);
+
+            Assert.StartsWith("Error exporting tables to Excel:", result);
+            newExportDirectories = Directory
+                .EnumerateDirectories(Path.GetTempPath(), "SqliteMcp-*")
+                .Where(path => !existingExportDirectories.Contains(path))
+                .ToList();
+            Assert.Empty(newExportDirectories);
+        }
+        finally
+        {
+            foreach (var directory in newExportDirectories)
+            {
+                if (Directory.Exists(directory))
+                {
+                    Directory.Delete(directory, recursive: true);
+                }
+            }
+        }
+    }
+
     // ── ExecutionPlan ──────────────────────────────────────────────────────
 
     [Fact]
