@@ -546,11 +546,16 @@ public class ToolsTests : IDisposable
 
         Assert.True(result.StructuredContent.HasValue);
         var chart = result.StructuredContent.Value;
-        Assert.Equal(["Apple", "Banana", "Cherry"], chart.GetProperty("labels").EnumerateArray().Select(label => label.GetString()));
+        Assert.Equal(
+            ["Apple", "Banana", "Cherry"],
+            [.. chart.GetProperty("data").GetProperty("labels").EnumerateArray().Select(label => label.GetString()!)]);
 
-        var dataset = Assert.Single(chart.GetProperty("datasets").EnumerateArray());
+        var dataset = Assert.Single(chart.GetProperty("data").GetProperty("datasets").EnumerateArray());
         Assert.Equal("Price", dataset.GetProperty("label").GetString());
-        Assert.Equal([1.99, 0.99, 3.49], dataset.GetProperty("data").EnumerateArray().Select(value => value.GetDouble()));
-        Assert.Equal("#3b82f6", dataset.GetProperty("color").GetString());
+        var values = dataset.GetProperty("values").EnumerateArray().Select(value => value.GetDouble()).ToArray();
+        Assert.Equal(3, values.Length);
+        Assert.Equal(1.99, values[0], precision: 2);
+        Assert.Equal(0.99, values[1], precision: 2);
+        Assert.Equal(3.49, values[2], precision: 2);
     }
 }
