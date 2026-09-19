@@ -1,0 +1,1268 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sqlite Query Visualization</title>
+    <style>
+        .chart-container {
+            width: 100%;
+            max-width: 900px;
+            height: 400px;
+            margin: 0 auto;
+            position: relative;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+
+        .chart-container svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+            overflow: visible;
+        }
+
+        .chart-grid {
+            stroke: currentColor;
+            opacity: 0.12;
+            stroke-width: 1;
+        }
+
+        .chart-axis {
+            stroke: currentColor;
+            opacity: 0.35;
+        }
+
+        .chart-label {
+            fill: currentColor;
+            font-size: 12px;
+        }
+
+        .chart-value {
+            fill: currentColor;
+            font-size: 11px;
+            text-anchor: middle;
+        }
+
+        .chart-tooltip {
+            position: absolute;
+            display: none;
+            padding: 6px 10px;
+            border-radius: 5px;
+            background: rgba(0, 0, 0, 0.85);
+            color: white;
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 10;
+            white-space: nowrap;
+        }
+
+        .chart-point,
+        .chart-bar,
+        .chart-slice {
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="chart" class="chart-container"></div>
+
+
+    <script>
+        let nextRequestId = 1;
+        const pendingRequests = new Map();
+
+        window.addEventListener("message", (event) => {
+            const msg = event.data;
+            if (!msg || msg.jsonrpc !== "2.0") return;
+
+            if (msg.id !== undefined && pendingRequests.has(msg.id)) {
+                const { resolve, reject } = pendingRequests.get(msg.id);
+                pendingRequests.delete(msg.id);
+                msg.error ? reject(new Error(msg.error.message || JSON.stringify(msg.error))) : resolve(msg.result);
+                return;
+            }
+
+            if (msg.method === "ui/notifications/tool-input") handleToolInput(msg.params);
+            if (msg.method === "ui/notifications/tool-result") handleToolResult(msg.params);
+        });
+
+        async function visualize() {
+            const query = document.getElementById("Query").value;
+            const chartType = document.getElementById("ChartType").value;
+            const result = await sendRequest('tools/call', {
+                name: 'visualize',
+                arguments: { sqlQuery: query, chartType: chartType }
+            });
+            handleToolResult(result);
+        }
+
+        function handleToolInput(params) {
+            console.log("Received tool input:", params);
+        }
+
+        function handleToolResult(params) {
+            console.log("Received tool result:", params);
+            const structuredContent = params.structuredContent;
+            if (!structuredContent) return;
+            renderChart("#chart", structuredContent.data, structuredContent.chartType);
+        }
+
+        function sendRequest(method, params) {
+            const id = nextRequestId++;
+            return new Promise((resolve, reject) => {
+                pendingRequests.set(id, { resolve, reject });
+                window.parent.postMessage({ jsonrpc: "2.0", id, method, params: params || {} }, "*");
+            });
+        }
+
+        function sendNotification(method, params) {
+            window.parent.postMessage({ jsonrpc: "2.0", method, params: params || {} }, "*");
+        }
+
+        async function initialize() {
+            if (window.parent === window) {
+                console.error("This UI must be loaded by an MCP app host.");
+                return;
+            }
+
+            await sendRequest("ui/initialize", {
+                protocolVersion: "2025-11-25",
+                appInfo: { name: "sqlite-mcp-server", version: "1.0.0" },
+                appCapabilities: {},
+            });
+
+            sendNotification("ui/notifications/initialized", {});
+        }
+
+        initialize();
+
+        function renderChart(container, chartData, type, options = {}) {
+
+            const element =
+                typeof container === "string"
+                    ? document.querySelector(container)
+                    : container;
+
+            if (!element) {
+                throw new Error("Chart container not found.");
+            }
+
+            if (!chartData ||
+                !Array.isArray(chartData.labels) ||
+                !Array.isArray(chartData.datasets)) {
+
+                throw new Error("Invalid chart data.");
+            }
+
+            if (chartData.labels.length === 0 ||
+                chartData.datasets.length === 0) {
+
+                element.innerHTML = "";
+                return;
+            }
+
+            const labels = chartData.labels;
+            const datasets = chartData.datasets;
+
+            const width = 800;
+            const height = 400;
+
+            const margin = {
+                top: 45,
+                right: 30,
+                bottom: 60,
+                left: 60
+            };
+
+            const chartWidth =
+                width - margin.left - margin.right;
+
+            const chartHeight =
+                height - margin.top - margin.bottom;
+
+            const colors = options.colors || [
+                "#4f46e5",
+                "#06b6d4",
+                "#10b981",
+                "#f59e0b",
+                "#ef4444",
+                "#8b5cf6",
+                "#ec4899",
+                "#14b8a6"
+            ];
+
+            element.innerHTML = "";
+
+            /*
+             * ---------------------------------------------------------
+             * SVG
+             * ---------------------------------------------------------
+             */
+
+            const svg =
+                document.createElementNS(
+                    "http://www.w3.org/2000/svg",
+                    "svg"
+                );
+
+            svg.setAttribute(
+                "viewBox",
+                `0 0 ${width} ${height}`
+            );
+
+            svg.setAttribute(
+                "preserveAspectRatio",
+                "xMidYMid meet"
+            );
+
+            element.appendChild(svg);
+
+
+            /*
+             * ---------------------------------------------------------
+             * Tooltip
+             * ---------------------------------------------------------
+             */
+
+            const tooltip =
+                document.createElement("div");
+
+            tooltip.style.position = "absolute";
+            tooltip.style.display = "none";
+            tooltip.style.padding = "7px 10px";
+            tooltip.style.borderRadius = "5px";
+            tooltip.style.background = "rgba(0,0,0,0.85)";
+            tooltip.style.color = "#fff";
+            tooltip.style.fontSize = "12px";
+            tooltip.style.pointerEvents = "none";
+            tooltip.style.zIndex = "100";
+            tooltip.style.whiteSpace = "nowrap";
+
+            element.style.position = "relative";
+
+            element.appendChild(tooltip);
+
+
+            /*
+             * ---------------------------------------------------------
+             * Helpers
+             * ---------------------------------------------------------
+             */
+
+            function svgElement(name, attributes = {}) {
+
+                const el =
+                    document.createElementNS(
+                        "http://www.w3.org/2000/svg",
+                        name
+                    );
+
+                Object.entries(attributes).forEach(
+                    ([key, value]) => {
+                        el.setAttribute(key, value);
+                    }
+                );
+
+                return el;
+            }
+
+
+            function text(
+                value,
+                x,
+                y,
+                className = "chart-label"
+            ) {
+
+                const el = svgElement("text", {
+                    x,
+                    y,
+                    class: className
+                });
+
+                el.textContent = value;
+
+                svg.appendChild(el);
+
+                return el;
+            }
+
+
+            function showTooltip(event, content) {
+
+                const rect =
+                    element.getBoundingClientRect();
+
+                tooltip.innerHTML = content;
+
+                tooltip.style.display = "block";
+
+                tooltip.style.left =
+                    `${event.clientX - rect.left + 10}px`;
+
+                tooltip.style.top =
+                    `${event.clientY - rect.top - 35}px`;
+            }
+
+
+            function hideTooltip() {
+                tooltip.style.display = "none";
+            }
+
+
+            function getNumericValues() {
+
+                const values = [];
+
+                datasets.forEach(dataset => {
+
+                    dataset.values.forEach(value => {
+
+                        if (typeof value === "number" &&
+                            !Number.isNaN(value)) {
+
+                            values.push(value);
+                        }
+                    });
+                });
+
+                return values;
+            }
+
+
+            function getRange() {
+
+                const values = getNumericValues();
+
+                if (values.length === 0) {
+                    return {
+                        min: 0,
+                        max: 1
+                    };
+                }
+
+                let min = Math.min(...values);
+                let max = Math.max(...values);
+
+                if (min > 0) {
+                    min = 0;
+                }
+
+                if (min === max) {
+                    max = min + 1;
+                }
+
+                return { min, max };
+            }
+
+
+            function niceNumber(value) {
+
+                if (value === 0) {
+                    return "0";
+                }
+
+                if (Math.abs(value) >= 1000000) {
+                    return (value / 1000000).toFixed(1) + "M";
+                }
+
+                if (Math.abs(value) >= 1000) {
+                    return (value / 1000).toFixed(1) + "K";
+                }
+
+                if (Number.isInteger(value)) {
+                    return value.toString();
+                }
+
+                return value.toFixed(1);
+            }
+
+
+            /*
+             * ---------------------------------------------------------
+             * Legend
+             * ---------------------------------------------------------
+             */
+
+            function renderLegend() {
+
+                if (datasets.length <= 1) {
+                    return;
+                }
+
+                const legendY = 20;
+
+                let currentX = margin.left;
+
+                datasets.forEach((dataset, index) => {
+
+                    const color =
+                        colors[index % colors.length];
+
+                    const rect = svgElement("rect", {
+                        x: currentX,
+                        y: legendY - 10,
+                        width: 12,
+                        height: 12,
+                        rx: 2,
+                        fill: color
+                    });
+
+                    svg.appendChild(rect);
+
+                    const label =
+                        text(
+                            dataset.label,
+                            currentX + 18,
+                            legendY
+                        );
+
+                    label.setAttribute(
+                        "font-size",
+                        "12"
+                    );
+
+                    const estimatedWidth =
+                        (dataset.label?.length || 5) * 7 + 40;
+
+                    currentX += estimatedWidth;
+                });
+            }
+
+
+            /*
+             * ---------------------------------------------------------
+             * Grid
+             * ---------------------------------------------------------
+             */
+
+            function renderGrid(min, max) {
+
+                const range = max - min;
+
+                for (let i = 0; i <= 5; i++) {
+
+                    const value =
+                        min + range * (i / 5);
+
+                    const y =
+                        margin.top +
+                        chartHeight -
+                        ((value - min) / range) *
+                        chartHeight;
+
+                    const line =
+                        svgElement("line", {
+                            x1: margin.left,
+                            y1: y,
+                            x2: width - margin.right,
+                            y2: y,
+                            class: "chart-grid"
+                        });
+
+                    svg.appendChild(line);
+
+                    const label =
+                        text(
+                            niceNumber(value),
+                            margin.left - 10,
+                            y + 4
+                        );
+
+                    label.setAttribute(
+                        "text-anchor",
+                        "end"
+                    );
+                }
+            }
+
+
+            /*
+             * ---------------------------------------------------------
+             * BAR CHART
+             * ---------------------------------------------------------
+             */
+
+            function renderBar() {
+
+                const range = getRange();
+
+                renderGrid(range.min, range.max);
+
+                const datasetCount =
+                    datasets.length;
+
+                const groupWidth =
+                    chartWidth / labels.length;
+
+                const barGap = 5;
+
+                const barWidth =
+                    Math.max(
+                        5,
+                        (groupWidth -
+                            barGap * (datasetCount + 1))
+                        / datasetCount
+                    );
+
+                labels.forEach(
+                    (label, labelIndex) => {
+
+                        datasets.forEach(
+                            (dataset, datasetIndex) => {
+
+                                const value =
+                                    Number(
+                                        dataset.values[labelIndex] ?? 0
+                                    );
+
+                                const barHeight =
+                                    ((value - range.min) /
+                                        (range.max - range.min)) *
+                                    chartHeight;
+
+                                const x =
+                                    margin.left +
+                                    labelIndex * groupWidth +
+                                    barGap +
+                                    datasetIndex *
+                                    (barWidth + barGap);
+
+                                const y =
+                                    margin.top +
+                                    chartHeight -
+                                    barHeight;
+
+                                const color =
+                                    colors[
+                                    datasetIndex %
+                                    colors.length
+                                    ];
+
+                                const bar =
+                                    svgElement("rect", {
+                                        x,
+                                        y,
+                                        width: barWidth,
+                                        height: Math.max(
+                                            0,
+                                            barHeight
+                                        ),
+                                        rx: 3,
+                                        fill: color,
+                                        class: "chart-bar"
+                                    });
+
+                                bar.addEventListener(
+                                    "mousemove",
+                                    event => {
+
+                                        showTooltip(
+                                            event,
+                                            `<strong>${dataset.label}</strong><br>` +
+                                            `${label}: ${niceNumber(value)}`
+                                        );
+                                    }
+                                );
+
+                                bar.addEventListener(
+                                    "mouseleave",
+                                    hideTooltip
+                                );
+
+                                svg.appendChild(bar);
+                            }
+                        );
+
+                        const labelText =
+                            text(
+                                label,
+                                margin.left +
+                                labelIndex * groupWidth +
+                                groupWidth / 2,
+                                height - 20
+                            );
+
+                        labelText.setAttribute(
+                            "text-anchor",
+                            "middle"
+                        );
+                    }
+                );
+
+                renderLegend();
+            }
+
+
+            /*
+             * ---------------------------------------------------------
+             * LINE / AREA
+             * ---------------------------------------------------------
+             */
+
+            function renderLine(isArea = false) {
+
+                const range = getRange();
+
+                renderGrid(range.min, range.max);
+
+                datasets.forEach(
+                    (dataset, datasetIndex) => {
+
+                        const color =
+                            colors[
+                            datasetIndex %
+                            colors.length
+                            ];
+
+                        const points =
+                            dataset.values.map(
+                                (value, index) => {
+
+                                    const numericValue =
+                                        Number(value ?? 0);
+
+                                    const x =
+                                        margin.left +
+                                        (
+                                            index /
+                                            Math.max(
+                                                labels.length - 1,
+                                                1
+                                            )
+                                        ) *
+                                        chartWidth;
+
+                                    const y =
+                                        margin.top +
+                                        chartHeight -
+                                        (
+                                            (numericValue -
+                                                range.min) /
+                                            (range.max -
+                                                range.min)
+                                        ) *
+                                        chartHeight;
+
+                                    return {
+                                        x,
+                                        y,
+                                        value: numericValue,
+                                        label: labels[index]
+                                    };
+                                }
+                            );
+
+                        const pathData =
+                            points
+                                .map(
+                                    (point, index) =>
+                                        `${index === 0 ? "M" : "L"} ` +
+                                        `${point.x} ${point.y}`
+                                )
+                                .join(" ");
+
+                        /*
+                         * Area
+                         */
+
+                        if (isArea) {
+
+                            const first =
+                                points[0];
+
+                            const last =
+                                points[points.length - 1];
+
+                            const areaPath =
+                                `${pathData}
+                         L ${last.x}
+                           ${margin.top + chartHeight}
+                         L ${first.x}
+                           ${margin.top + chartHeight}
+                         Z`;
+
+                            const area =
+                                svgElement("path", {
+                                    d: areaPath,
+                                    fill: color,
+                                    opacity: "0.15"
+                                });
+
+                            svg.appendChild(area);
+                        }
+
+
+                        /*
+                         * Line
+                         */
+
+                        const path =
+                            svgElement("path", {
+                                d: pathData,
+                                fill: "none",
+                                stroke: color,
+                                "stroke-width": 3,
+                                "stroke-linejoin": "round",
+                                "stroke-linecap": "round"
+                            });
+
+                        svg.appendChild(path);
+
+
+                        /*
+                         * Points
+                         */
+
+                        points.forEach(point => {
+
+                            const circle =
+                                svgElement("circle", {
+                                    cx: point.x,
+                                    cy: point.y,
+                                    r: 5,
+                                    fill: color,
+                                    class: "chart-point"
+                                });
+
+                            circle.addEventListener(
+                                "mousemove",
+                                event => {
+
+                                    showTooltip(
+                                        event,
+                                        `<strong>${dataset.label}</strong><br>` +
+                                        `${point.label}: ${niceNumber(point.value)}`
+                                    );
+                                }
+                            );
+
+                            circle.addEventListener(
+                                "mouseleave",
+                                hideTooltip
+                            );
+
+                            svg.appendChild(circle);
+                        });
+                    }
+                );
+
+
+                /*
+                 * X axis labels
+                 */
+
+                labels.forEach(
+                    (label, index) => {
+
+                        const x =
+                            margin.left +
+                            (
+                                index /
+                                Math.max(
+                                    labels.length - 1,
+                                    1
+                                )
+                            ) *
+                            chartWidth;
+
+                        const labelText =
+                            text(
+                                label,
+                                x,
+                                height - 20
+                            );
+
+                        labelText.setAttribute(
+                            "text-anchor",
+                            "middle"
+                        );
+                    }
+                );
+
+                renderLegend();
+            }
+
+
+            /*
+             * ---------------------------------------------------------
+             * PIE / DONUT
+             * ---------------------------------------------------------
+             */
+
+            function renderPie(isDonut = false) {
+
+                const dataset =
+                    datasets[0];
+
+                const values =
+                    dataset.values.map(
+                        value => Number(value ?? 0)
+                    );
+
+                const total =
+                    values.reduce(
+                        (sum, value) =>
+                            sum + Math.max(value, 0),
+                        0
+                    );
+
+                if (total === 0) {
+                    return;
+                }
+
+                const cx =
+                    margin.left +
+                    chartWidth / 2;
+
+                const cy =
+                    margin.top +
+                    chartHeight / 2;
+
+                const radius =
+                    Math.min(
+                        chartWidth,
+                        chartHeight
+                    ) / 2 - 30;
+
+                const innerRadius =
+                    isDonut
+                        ? radius * 0.55
+                        : 0;
+
+                let startAngle =
+                    -Math.PI / 2;
+
+                values.forEach(
+                    (value, index) => {
+
+                        if (value <= 0) {
+                            return;
+                        }
+
+                        const angle =
+                            (value / total) *
+                            Math.PI * 2;
+
+                        const endAngle =
+                            startAngle + angle;
+
+                        const x1 =
+                            cx +
+                            radius *
+                            Math.cos(startAngle);
+
+                        const y1 =
+                            cy +
+                            radius *
+                            Math.sin(startAngle);
+
+                        const x2 =
+                            cx +
+                            radius *
+                            Math.cos(endAngle);
+
+                        const y2 =
+                            cy +
+                            radius *
+                            Math.sin(endAngle);
+
+                        const largeArc =
+                            angle > Math.PI
+                                ? 1
+                                : 0;
+
+                        let pathData;
+
+                        if (isDonut) {
+
+                            const ix1 =
+                                cx +
+                                innerRadius *
+                                Math.cos(startAngle);
+
+                            const iy1 =
+                                cy +
+                                innerRadius *
+                                Math.sin(startAngle);
+
+                            const ix2 =
+                                cx +
+                                innerRadius *
+                                Math.cos(endAngle);
+
+                            const iy2 =
+                                cy +
+                                innerRadius *
+                                Math.sin(endAngle);
+
+                            pathData =
+                                `M ${x1} ${y1}
+                         A ${radius} ${radius}
+                           0 ${largeArc} 1
+                           ${x2} ${y2}
+                         L ${ix2} ${iy2}
+                         A ${innerRadius} ${innerRadius}
+                           0 ${largeArc} 0
+                           ${ix1} ${iy1}
+                         Z`;
+
+                        } else {
+
+                            pathData =
+                                `M ${cx} ${cy}
+                         L ${x1} ${y1}
+                         A ${radius} ${radius}
+                           0 ${largeArc} 1
+                           ${x2} ${y2}
+                         Z`;
+                        }
+
+                        const color =
+                            colors[
+                            index % colors.length
+                            ];
+
+                        const slice =
+                            svgElement("path", {
+                                d: pathData,
+                                fill: color,
+                                class: "chart-slice"
+                            });
+
+                        const percentage =
+                            ((value / total) * 100)
+                                .toFixed(1);
+
+                        slice.addEventListener(
+                            "mousemove",
+                            event => {
+
+                                showTooltip(
+                                    event,
+                                    `<strong>${labels[index]}</strong><br>` +
+                                    `${niceNumber(value)} (${percentage}%)`
+                                );
+                            }
+                        );
+
+                        slice.addEventListener(
+                            "mouseleave",
+                            hideTooltip
+                        );
+
+                        svg.appendChild(slice);
+
+                        startAngle = endAngle;
+                    }
+                );
+
+
+                /*
+                 * Center value for donut
+                 */
+
+                if (isDonut) {
+
+                    const centerValue =
+                        text(
+                            niceNumber(total),
+                            cx,
+                            cy + 5,
+                            "chart-center-value"
+                        );
+
+                    centerValue.setAttribute(
+                        "text-anchor",
+                        "middle"
+                    );
+
+                    centerValue.setAttribute(
+                        "font-size",
+                        "20"
+                    );
+
+                    centerValue.setAttribute(
+                        "font-weight",
+                        "600"
+                    );
+                }
+
+
+                /*
+                 * Legend
+                 */
+
+                const legendX =
+                    width - margin.right - 120;
+
+                let legendY = margin.top + 20;
+
+                labels.forEach(
+                    (label, index) => {
+
+                        const color =
+                            colors[
+                            index % colors.length
+                            ];
+
+                        const rect =
+                            svgElement("rect", {
+                                x: legendX,
+                                y: legendY - 10,
+                                width: 12,
+                                height: 12,
+                                rx: 2,
+                                fill: color
+                            });
+
+                        svg.appendChild(rect);
+
+                        text(
+                            label,
+                            legendX + 18,
+                            legendY
+                        );
+
+                        legendY += 22;
+                    }
+                );
+            }
+
+
+            /*
+             * ---------------------------------------------------------
+             * SCATTER
+             * ---------------------------------------------------------
+             *
+             * Scatter expects:
+             *
+             * datasets: [
+             *   {
+             *      label: "Customers",
+             *      values: [
+             *          { x: 10, y: 20 },
+             *          { x: 20, y: 35 }
+             *      ]
+             *   }
+             * ]
+             */
+
+            function renderScatter() {
+
+                const allPoints = [];
+
+                datasets.forEach(
+                    dataset => {
+
+                        dataset.values.forEach(
+                            point => {
+
+                                if (point &&
+                                    typeof point.x === "number" &&
+                                    typeof point.y === "number") {
+
+                                    allPoints.push(point);
+                                }
+                            }
+                        );
+                    }
+                );
+
+                if (allPoints.length === 0) {
+                    return;
+                }
+
+                const minX =
+                    Math.min(
+                        ...allPoints.map(p => p.x)
+                    );
+
+                const maxX =
+                    Math.max(
+                        ...allPoints.map(p => p.x)
+                    );
+
+                const minY =
+                    Math.min(
+                        ...allPoints.map(p => p.y)
+                    );
+
+                const maxY =
+                    Math.max(
+                        ...allPoints.map(p => p.y)
+                    );
+
+                const rangeX =
+                    maxX - minX || 1;
+
+                const rangeY =
+                    maxY - minY || 1;
+
+
+                /*
+                 * Grid
+                 */
+
+                for (let i = 0; i <= 5; i++) {
+
+                    const y =
+                        margin.top +
+                        chartHeight -
+                        (i / 5) *
+                        chartHeight;
+
+                    const line =
+                        svgElement("line", {
+                            x1: margin.left,
+                            y1: y,
+                            x2: width - margin.right,
+                            y2: y,
+                            class: "chart-grid"
+                        });
+
+                    svg.appendChild(line);
+
+                    const value =
+                        minY +
+                        (i / 5) *
+                        rangeY;
+
+                    const label =
+                        text(
+                            niceNumber(value),
+                            margin.left - 10,
+                            y + 4
+                        );
+
+                    label.setAttribute(
+                        "text-anchor",
+                        "end"
+                    );
+                }
+
+
+                /*
+                 * Points
+                 */
+
+                datasets.forEach(
+                    (dataset, datasetIndex) => {
+
+                        const color =
+                            colors[
+                            datasetIndex %
+                            colors.length
+                            ];
+
+                        dataset.values.forEach(
+                            point => {
+
+                                if (!point ||
+                                    typeof point.x !== "number" ||
+                                    typeof point.y !== "number") {
+
+                                    return;
+                                }
+
+                                const x =
+                                    margin.left +
+                                    (
+                                        (point.x - minX) /
+                                        rangeX
+                                    ) *
+                                    chartWidth;
+
+                                const y =
+                                    margin.top +
+                                    chartHeight -
+                                    (
+                                        (point.y - minY) /
+                                        rangeY
+                                    ) *
+                                    chartHeight;
+
+                                const circle =
+                                    svgElement("circle", {
+                                        cx: x,
+                                        cy: y,
+                                        r: 6,
+                                        fill: color,
+                                        class: "chart-point"
+                                    });
+
+                                circle.addEventListener(
+                                    "mousemove",
+                                    event => {
+
+                                        showTooltip(
+                                            event,
+                                            `<strong>${dataset.label}</strong><br>` +
+                                            `X: ${niceNumber(point.x)}<br>` +
+                                            `Y: ${niceNumber(point.y)}`
+                                        );
+                                    }
+                                );
+
+                                circle.addEventListener(
+                                    "mouseleave",
+                                    hideTooltip
+                                );
+
+                                svg.appendChild(circle);
+                            }
+                        );
+                    }
+                );
+
+                renderLegend();
+            }
+
+
+            /*
+             * ---------------------------------------------------------
+             * Render
+             * ---------------------------------------------------------
+             */
+
+            switch (
+            String(type).toLowerCase()
+            ) {
+
+                case "bar":
+                    renderBar();
+                    break;
+
+                case "line":
+                    renderLine(false);
+                    break;
+
+                case "area":
+                    renderLine(true);
+                    break;
+
+                case "pie":
+                    renderPie(false);
+                    break;
+
+                case "donut":
+                    renderPie(true);
+                    break;
+
+                case "scatter":
+                    renderScatter();
+                    break;
+
+                default:
+                    throw new Error(
+                        `Unsupported chart type: ${type}`
+                    );
+            }
+        }
+    </script>
+</body>
+
+</html>

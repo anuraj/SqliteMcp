@@ -15,5 +15,10 @@ namespace SqliteMcp.Resources
         [McpMeta("ui", """{"csp":{"connectDomains":[]},"prefersBorder":true}""")]
         [Description("Interactive SQLite execution plan UI")]
         public static string GetSqliteExecPlanUi() => File.ReadAllText(Path.Combine(UiDir, "exec_plan.html"));
+
+        [McpServerResource(UriTemplate = "ui://sqlite-app/visualize", Name = "sqlite-visualize-ui", MimeType = McpApps.HtmlMimeType)]
+        [McpMeta("ui", """{"csp":{"connectDomains":[]},"prefersBorder":true}""")]
+        [Description("Interactive SQLite Query visualization UI")]
+        public static string GetSqliteVisualizeUi() => File.ReadAllText(Path.Combine(UiDir, "visualize.html"));
     }
 }

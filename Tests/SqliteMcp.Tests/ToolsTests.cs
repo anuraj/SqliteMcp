@@ -533,4 +533,24 @@ public class ToolsTests : IDisposable
         Assert.StartsWith("Error getting execution plan:", text);
         Assert.False(result.StructuredContent.HasValue);
     }
+
+    // ── Visualize ──────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Visualize_SelectQuery_ReturnsChartData()
+    {
+        CreateProductsTable();
+        SeedProducts();
+
+        var result = await _tools.Visualize("SELECT Name, Price FROM Products ORDER BY Id", "Bar", CancellationToken.None);
+
+        Assert.True(result.StructuredContent.HasValue);
+        var chart = result.StructuredContent.Value;
+        Assert.Equal(["Apple", "Banana", "Cherry"], chart.GetProperty("labels").EnumerateArray().Select(label => label.GetString()));
+
+        var dataset = Assert.Single(chart.GetProperty("datasets").EnumerateArray());
+        Assert.Equal("Price", dataset.GetProperty("label").GetString());
+        Assert.Equal([1.99, 0.99, 3.49], dataset.GetProperty("data").EnumerateArray().Select(value => value.GetDouble()));
+        Assert.Equal("#3b82f6", dataset.GetProperty("color").GetString());
+    }
 }
