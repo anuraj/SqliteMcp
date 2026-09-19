@@ -2,7 +2,6 @@ using System.ComponentModel;
 using System.Data;
 using System.Data.Common;
 using System.Text.Json;
-using ModelContextProtocol.Extensions.Apps;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 
@@ -16,7 +15,7 @@ public sealed partial class SqliteMcpTools
     };
 
     [McpServerTool(Destructive = false, ReadOnly = true, Name = "execution_plan")]
-    [McpAppUi(ResourceUri = "ui://sqlite-app/execution-plan")]
+    [McpMeta("ui", JsonValue = """{ "resourceUri": "ui://sqlite-app/execution-plan" }""")]
     [Description("Get the execution plan for a SQL query.")]
     public async Task<CallToolResult> ExecutionPlan([Description("SQL query to get the execution plan for")] string sqlQuery, CancellationToken cancellationToken)
     {
@@ -60,7 +59,7 @@ public sealed partial class SqliteMcpTools
     }
 
     [McpServerTool(Destructive = false, ReadOnly = true, Name = "visualize")]
-    [McpAppUi(ResourceUri = "ui://sqlite-app/visualize")]
+    [McpMeta("ui", JsonValue = """{ "resourceUri": "ui://sqlite-app/visualize" }""")]
     [Description("Get the Visualization for a SQL query.")]
     public async Task<CallToolResult> Visualize([Description("SQL query to get the query visualization for")] string sqlQuery,
         [Description("Chart type for the visualization, supported options are Line, Bar, Area, Donut, Pie, and Scatter only.")] string chartType,

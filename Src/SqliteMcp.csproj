@@ -13,13 +13,12 @@
     <PublishSingleFile>true</PublishSingleFile>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageId>SqliteMcp</PackageId>
-    <PackageVersion>1.0.8</PackageVersion>
+    <PackageVersion>1.1.0</PackageVersion>
     <PackageTags>AI; MCP; server; stdio</PackageTags>
     <Description>MCP server for Sqlite database operations.</Description>
     <Authors>Anuraj</Authors>
     <ProjectUrl>https://github.com/anuraj/SqliteMcp</ProjectUrl>
     <RepositoryUrl>https://github.com/anuraj/SqliteMcp</RepositoryUrl>
-    <NoWarn>$(NoWarn);MCPEXP003</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
