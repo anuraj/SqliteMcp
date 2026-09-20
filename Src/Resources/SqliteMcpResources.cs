@@ -11,13 +11,13 @@ namespace SqliteMcp.Resources
         private static readonly string UiDir = Path.Combine(AppContext.BaseDirectory, "UI");
 
         [McpServerResource(UriTemplate = "ui://sqlite-app/execution-plan", Name = "sqlite-exec-plan-ui", MimeType = "text/html;profile=mcp-app")]
-        [McpMeta("ui", """{"csp":{"connectDomains":[]},"prefersBorder":true}""")]
         [Description("Interactive SQLite execution plan UI")]
         public static string GetSqliteExecPlanUi() => File.ReadAllText(Path.Combine(UiDir, "exec_plan.html"));
 
-        [McpServerResource(UriTemplate = "ui://sqlite-app/visualize", Name = "sqlite-visualize-ui", MimeType = "text/html;profile=mcp-app")]
-        [McpMeta("ui", """{"csp":{"connectDomains":[]},"prefersBorder":true}""")]
+        [McpServerResource(UriTemplate = "ui://sqlite-app/visualize",
+            Name = "sqlite-visualize-ui", MimeType = "text/html;profile=mcp-app")]
         [Description("Interactive SQLite Query visualization UI")]
-        public static string GetSqliteVisualizeUi() => File.ReadAllText(Path.Combine(UiDir, "visualize.html"));
+        public static string GetSqliteVisualizeUi() =>
+            File.ReadAllText(Path.Combine(UiDir, "visualize.html"));
     }
 }

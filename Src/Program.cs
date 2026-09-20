@@ -25,7 +25,11 @@ builder.Logging.AddConsole(consoleLogOptions =>
 builder.Services
     .AddMcpServer(options =>
     {
-        options.ServerInfo = new Implementation { Name = "Sqlite MCP Server", Version = "1.0.0" };
+        options.ServerInfo = new Implementation
+        {
+            Name = "Sqlite MCP Server",
+            Version = "1.1.0"
+        };
         options.Capabilities = new ServerCapabilities
         {
             Tools = new ToolsCapability(),
